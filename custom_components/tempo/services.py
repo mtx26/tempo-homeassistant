@@ -20,8 +20,13 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.util import dt as dt_util
 
 from .api import TempoApiError, TempoConflictError, TempoError, TempoNotFoundError
-from .const import DOMAIN
+from .const import CONF_DASHBOARD, DOMAIN
 from .coordinator import TempoConfigEntry
+from .dashboard import (
+    DASHBOARD_URL_PATH,
+    async_register_dashboard,
+    async_unregister_dashboard,
+)
 
 ATTR_CONFIG_ENTRY_ID = "config_entry_id"
 
@@ -39,6 +44,8 @@ SERVICE_SET_AVAILABILITY = "set_availability"
 SERVICE_ACKNOWLEDGE_NOTIFICATION = "acknowledge_notification"
 SERVICE_INTERPRET = "interpret"
 SERVICE_CONFIRM_ACTIVITY = "confirm_activity"
+SERVICE_INSTALL_DASHBOARD = "install_dashboard"
+SERVICE_REMOVE_DASHBOARD = "remove_dashboard"
 
 _ENTRY: dict[vol.Marker, Any] = {vol.Optional(ATTR_CONFIG_ENTRY_ID): cv.string}
 _ID = vol.All(cv.string, vol.Length(min=1, max=200))
@@ -328,6 +335,19 @@ async def _interpret(hass: HomeAssistant, call: ServiceCall) -> ServiceResponse:
     }
 
 
+async def _install_dashboard(hass: HomeAssistant, call: ServiceCall) -> ServiceResponse:
+    entry = _entry(hass, call)
+    async_register_dashboard(hass, entry.entry_id)
+    hass.config_entries.async_update_entry(entry, options={**entry.options, CONF_DASHBOARD: True})
+    return {"url_path": DASHBOARD_URL_PATH}
+
+
+async def _remove_dashboard(hass: HomeAssistant, call: ServiceCall) -> None:
+    entry = _entry(hass, call)
+    async_unregister_dashboard(hass, entry.entry_id)
+    hass.config_entries.async_update_entry(entry, options={**entry.options, CONF_DASHBOARD: False})
+
+
 @callback
 def async_setup_services(hass: HomeAssistant) -> None:
     """Register the Tempo service actions."""
@@ -358,4 +378,11 @@ def async_setup_services(hass: HomeAssistant) -> None:
     register(SERVICE_SET_AVAILABILITY, _set_availability, SET_AVAILABILITY_SCHEMA)
     register(SERVICE_ACKNOWLEDGE_NOTIFICATION, _acknowledge, NOTIFICATION_SCHEMA)
     register(SERVICE_CONFIRM_ACTIVITY, _confirm_activity, CONFIRM_ACTIVITY_SCHEMA)
+    register(
+        SERVICE_INSTALL_DASHBOARD,
+        _install_dashboard,
+        ENTRY_ONLY_SCHEMA,
+        SupportsResponse.OPTIONAL,
+    )
+    register(SERVICE_REMOVE_DASHBOARD, _remove_dashboard, ENTRY_ONLY_SCHEMA)
     register(SERVICE_INTERPRET, _interpret, INTERPRET_SCHEMA, SupportsResponse.OPTIONAL)

@@ -12,6 +12,7 @@ import pytest
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.const import CONF_API_TOKEN, CONF_URL, CONF_VERIFY_SSL
 from homeassistant.core import HomeAssistant
+from homeassistant.setup import async_setup_component
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
@@ -258,6 +259,12 @@ def calls(aioclient_mock: AiohttpClientMocker, method: str, path: str) -> list[t
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(enable_custom_integrations: None) -> None:
     """Enable loading custom integrations in all tests."""
+
+
+@pytest.fixture(autouse=True)
+async def core_components(hass: HomeAssistant) -> None:
+    """Set up the core component (always loaded in a real instance; conversation needs it)."""
+    assert await async_setup_component(hass, "homeassistant", {})
 
 
 @pytest.fixture(autouse=True)

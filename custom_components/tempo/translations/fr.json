@@ -52,11 +52,13 @@
         "data": {
           "tracker_entity_id": "Traceur du téléphone",
           "scan_interval": "Intervalle d'interrogation",
-          "notify_service": "Service de notification (facultatif)"
+          "notify_service": "Service de notification (facultatif)",
+          "dashboard": "Afficher le tableau de bord Tempo dans la barre latérale"
         },
         "data_description": {
           "scan_interval": "Secondes entre deux interrogations du backend (minimum 30).",
-          "notify_service": "Par exemple notify.mobile_app_telephone, utilisé pour les approbations et les alertes de départ."
+          "notify_service": "Par exemple notify.mobile_app_telephone, utilisé pour les approbations et les alertes de départ.",
+          "dashboard": "Ajoute un tableau de bord « Tempo » en lecture seule généré par l'intégration (agenda, départ, tâches, approbations, état)."
         }
       }
     },
@@ -123,6 +125,22 @@
       "tasks": {
         "name": "Tâches"
       }
+    },
+    "button": {
+      "replan": {
+        "name": "Replanifier"
+      },
+      "approve_oldest_proposal": {
+        "name": "Approuver la plus ancienne proposition"
+      },
+      "reject_oldest_proposal": {
+        "name": "Refuser la plus ancienne proposition"
+      }
+    },
+    "conversation": {
+      "assistant": {
+        "name": "Assistant"
+      }
     }
   },
   "exceptions": {
@@ -176,6 +194,15 @@
     },
     "race_start_required": {
       "message": "Une course doit avoir une heure de départ pour être confirmée."
+    },
+    "no_pending_proposal": {
+      "message": "Aucune proposition Tempo en attente."
+    },
+    "dashboard_unavailable": {
+      "message": "Les tableaux de bord ne sont pas disponibles (Lovelace n'est pas chargé)."
+    },
+    "dashboard_url_taken": {
+      "message": "Un autre tableau de bord utilise déjà l'URL /{url}."
     }
   },
   "services": {
@@ -444,6 +471,26 @@
         "start": {
           "name": "Début",
           "description": "Heure de début ; obligatoire pour une course, facultative pour un entraînement."
+        }
+      }
+    },
+    "install_dashboard": {
+      "name": "Installer le tableau de bord",
+      "description": "Ajoute le tableau de bord Tempo (lecture seule) à la barre latérale (conservé après redémarrage).",
+      "fields": {
+        "config_entry_id": {
+          "name": "Entrée de configuration",
+          "description": "Entrée Tempo à utiliser (facultatif s'il n'y en a qu'une)."
+        }
+      }
+    },
+    "remove_dashboard": {
+      "name": "Retirer le tableau de bord",
+      "description": "Retire le tableau de bord Tempo de la barre latérale.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Entrée de configuration",
+          "description": "Entrée Tempo à utiliser (facultatif s'il n'y en a qu'une)."
         }
       }
     }

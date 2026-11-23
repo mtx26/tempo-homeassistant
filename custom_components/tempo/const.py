@@ -11,6 +11,7 @@ LOGGER = logging.getLogger(__package__)
 
 CONF_TRACKER_ENTITY_ID: Final = "tracker_entity_id"
 CONF_NOTIFY_SERVICE: Final = "notify_service"
+CONF_DASHBOARD: Final = "dashboard"
 
 DEFAULT_SCAN_INTERVAL: Final = 60
 MIN_SCAN_INTERVAL: Final = 30

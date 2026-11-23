@@ -36,6 +36,22 @@
       "tasks": {
         "default": "mdi:clipboard-list"
       }
+    },
+    "button": {
+      "replan": {
+        "default": "mdi:calendar-refresh"
+      },
+      "approve_oldest_proposal": {
+        "default": "mdi:check-circle"
+      },
+      "reject_oldest_proposal": {
+        "default": "mdi:close-circle"
+      }
+    },
+    "conversation": {
+      "assistant": {
+        "default": "mdi:message-text"
+      }
     }
   },
   "services": {
@@ -80,6 +96,12 @@
     },
     "confirm_activity": {
       "service": "mdi:check-decagram"
+    },
+    "install_dashboard": {
+      "service": "mdi:view-dashboard"
+    },
+    "remove_dashboard": {
+      "service": "mdi:view-dashboard-outline"
     }
   }
 }

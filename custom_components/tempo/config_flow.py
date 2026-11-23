@@ -34,6 +34,7 @@ from .api import (
     normalize_url,
 )
 from .const import (
+    CONF_DASHBOARD,
     CONF_NOTIFY_SERVICE,
     CONF_TRACKER_ENTITY_ID,
     DEFAULT_SCAN_INTERVAL,
@@ -96,7 +97,7 @@ class TempoConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle the Tempo config flow."""
 
     VERSION = 1
-    MINOR_VERSION = 1
+    MINOR_VERSION = 2
 
     def __init__(self) -> None:
         """Initialize the flow."""
@@ -225,6 +226,7 @@ class TempoOptionsFlow(OptionsFlowWithReload):
                 options: dict[str, Any] = {
                     CONF_TRACKER_ENTITY_ID: tracker,
                     CONF_SCAN_INTERVAL: int(user_input[CONF_SCAN_INTERVAL]),
+                    CONF_DASHBOARD: bool(user_input.get(CONF_DASHBOARD, False)),
                 }
                 if notify:
                     options[CONF_NOTIFY_SERVICE] = notify
@@ -243,12 +245,14 @@ class TempoOptionsFlow(OptionsFlowWithReload):
                     )
                 ),
                 vol.Optional(CONF_NOTIFY_SERVICE): str,
+                vol.Optional(CONF_DASHBOARD, default=False): bool,
             }
         )
         suggested = {
             CONF_TRACKER_ENTITY_ID: current_tracker,
             CONF_SCAN_INTERVAL: entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
             CONF_NOTIFY_SERVICE: entry.options.get(CONF_NOTIFY_SERVICE, ""),
+            CONF_DASHBOARD: entry.options.get(CONF_DASHBOARD, False),
         }
         return self.async_show_form(
             step_id="init",

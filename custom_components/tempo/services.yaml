@@ -205,6 +205,14 @@ confirm_activity:
       selector:
         datetime:
 
+install_dashboard:
+  fields:
+    config_entry_id: *entry
+
+remove_dashboard:
+  fields:
+    config_entry_id: *entry
+
 interpret:
   fields:
     config_entry_id: *entry
