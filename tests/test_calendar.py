@@ -61,6 +61,7 @@ async def test_get_events_mapping(
     assert events[1]["location"] == "Campus Plaine"
     assert "Horaire fixe" in events[1]["description"]
     assert "Verrouillé" in events[2]["description"]
+    assert "État : planifié" in events[2]["description"]
     assert "Notes : Zone 2" in events[3]["description"]
     assert "Déplaçable" in events[3]["description"]
     fetched = calls(aioclient_mock, "GET", "/v1/schedule")

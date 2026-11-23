@@ -214,6 +214,13 @@ class TempoApiClient:
             await self._send("PATCH", f"/v1/activities/{_seg(activity_id)}", payload),
         )
 
+    async def confirm_activity(self, activity_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """POST /v1/activities/{id}/confirm (409 if not to_confirm, 422 if invalid)."""
+        return cast(
+            dict[str, Any],
+            await self._send("POST", f"/v1/activities/{_seg(activity_id)}/confirm", payload),
+        )
+
     async def block_action(self, block_id: str, action: str) -> None:
         """POST /v1/blocks/{id}/lock|unlock|done."""
         if action not in ("lock", "unlock", "done"):

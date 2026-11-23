@@ -184,6 +184,27 @@ acknowledge_notification:
       selector:
         text:
 
+confirm_activity:
+  fields:
+    config_entry_id: *entry
+    activity_id:
+      required: true
+      selector:
+        text:
+    duration_minutes:
+      required: true
+      example: 60
+      selector:
+        number:
+          min: 1
+          max: 43200
+          unit_of_measurement: min
+          mode: box
+    start:
+      required: false
+      selector:
+        datetime:
+
 interpret:
   fields:
     config_entry_id: *entry

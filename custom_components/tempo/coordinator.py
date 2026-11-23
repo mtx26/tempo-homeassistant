@@ -38,6 +38,7 @@ class TempoData:
     tasks: list[dict[str, Any]] = field(default_factory=list)
     proposals: list[dict[str, Any]] = field(default_factory=list)
     notifications: list[dict[str, Any]] = field(default_factory=list)
+    activities: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -55,7 +56,7 @@ type TempoConfigEntry = ConfigEntry[TempoRuntimeData]
 
 
 class TempoCoordinator(DataUpdateCoordinator[TempoData]):
-    """Poll summary, schedule, tasks, proposals and unread notifications."""
+    """Poll summary, schedule, tasks, proposals, unread notifications and activities."""
 
     config_entry: TempoConfigEntry
 
@@ -76,12 +77,20 @@ class TempoCoordinator(DataUpdateCoordinator[TempoData]):
     async def _async_update_data(self) -> TempoData:
         now = dt_util.now()
         try:
-            summary, schedule, tasks, proposals, notifications = await asyncio.gather(
+            (
+                summary,
+                schedule,
+                tasks,
+                proposals,
+                notifications,
+                activities,
+            ) = await asyncio.gather(
                 self.client.summary(),
                 self.client.schedule(now - SCHEDULE_PAST, now + SCHEDULE_FUTURE),
                 self.client.tasks(),
                 self.client.proposals(),
                 self.client.notifications(unread=True),
+                self.client.activities(),
             )
         except TempoAuthError as err:
             raise ConfigEntryAuthFailed(
@@ -99,6 +108,7 @@ class TempoCoordinator(DataUpdateCoordinator[TempoData]):
             tasks=list(tasks or []),
             proposals=list(proposals or []),
             notifications=list(notifications or []),
+            activities=list(activities or []),
         )
 
     async def async_fetch_schedule(self, start: datetime, end: datetime) -> list[dict[str, Any]]:

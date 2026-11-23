@@ -102,6 +102,7 @@ SCHEDULE: list[dict[str, Any]] = [
         "locked": True,
         "block_id": "block-1",
         "task_id": "task-1",
+        "state": "planned",
     },
     {
         "type": "training",
@@ -170,6 +171,45 @@ NOTIFICATIONS: list[dict[str, Any]] = [
     }
 ]
 
+ACTIVITIES: list[dict[str, Any]] = [
+    {
+        "id": "act-1",
+        "kind": "training",
+        "title": "Footing",
+        "status": "active",
+        "preferred_day": None,
+        "user_modified": False,
+        "duration_minutes": 60,
+    },
+    {
+        "id": "act-2",
+        "kind": "training",
+        "title": "Fractionné 10x400",
+        "status": "to_confirm",
+        "preferred_day": "2026-11-25",
+        "user_modified": False,
+        "duration_minutes": None,
+    },
+    {
+        "id": "act-3",
+        "kind": "race",
+        "title": "Cross de Bruxelles",
+        "status": "to_confirm",
+        "preferred_day": "2026-11-29",
+        "user_modified": False,
+        "duration_minutes": None,
+    },
+    {
+        "id": "act-4",
+        "kind": "training",
+        "title": "Annulé",
+        "status": "cancelled",
+        "preferred_day": None,
+        "user_modified": True,
+        "duration_minutes": 45,
+    },
+]
+
 
 def mock_backend(
     aioclient_mock: AiohttpClientMocker,
@@ -179,6 +219,7 @@ def mock_backend(
     tasks: list[dict[str, Any]] | None = None,
     proposals: list[dict[str, Any]] | None = None,
     notifications: list[dict[str, Any]] | None = None,
+    activities: list[dict[str, Any]] | None = None,
 ) -> None:
     """Register the read endpoints plus generic write endpoints."""
     aioclient_mock.get(
@@ -195,6 +236,10 @@ def mock_backend(
     aioclient_mock.get(
         f"{BASE}/v1/notifications",
         json=deepcopy(NOTIFICATIONS if notifications is None else notifications),
+    )
+    aioclient_mock.get(
+        f"{BASE}/v1/activities",
+        json=deepcopy(ACTIVITIES if activities is None else activities),
     )
     aioclient_mock.post(re.compile(r".*/v1/notifications/[^/]+/ack$"), status=204)
     aioclient_mock.patch(f"{BASE}/v1/settings", status=204)

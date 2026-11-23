@@ -258,6 +258,7 @@ async def test_interpret(
         "action": "add_task",
         "summary": "Tâche ajoutée",
         "applied": True,
+        "used_llm": False,
     }
     assert calls(aioclient_mock, "POST", "/v1/interpret")[-1][2] == {"text": "Ajoute 2 h d'analyse"}
 
@@ -285,3 +286,115 @@ async def test_service_descriptions_load(
     strings = json.loads(STRINGS.read_text(encoding="utf-8"))
     for name, desc in descriptions.items():
         assert set(desc["fields"]) == set(strings["services"][name]["fields"]), name
+
+
+async def test_confirm_activity(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, init_integration: MockConfigEntry
+) -> None:
+    """A training is confirmed with its duration; a race also needs its start."""
+    aioclient_mock.post(
+        f"{BASE}/v1/activities/act-2/confirm", json={"id": "act-2", "status": "active"}
+    )
+    aioclient_mock.post(
+        f"{BASE}/v1/activities/act-3/confirm", json={"id": "act-3", "status": "active"}
+    )
+    await hass.services.async_call(
+        DOMAIN, "confirm_activity", {"activity_id": "act-2", "duration_minutes": 75}, blocking=True
+    )
+    assert calls(aioclient_mock, "POST", "/v1/activities/act-2/confirm")[-1][2] == {
+        "duration_minutes": 75
+    }
+
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            DOMAIN,
+            "confirm_activity",
+            {"activity_id": "act-3", "duration_minutes": 90},
+            blocking=True,
+        )
+    assert err.value.translation_key == "race_start_required"
+    assert not calls(aioclient_mock, "POST", "/v1/activities/act-3/confirm")
+
+    await hass.services.async_call(
+        DOMAIN,
+        "confirm_activity",
+        {"activity_id": "act-3", "duration_minutes": 90, "start": "2026-11-29T10:30:00"},
+        blocking=True,
+    )
+    assert calls(aioclient_mock, "POST", "/v1/activities/act-3/confirm")[-1][2] == {
+        "duration_minutes": 90,
+        "start": "2026-11-29T10:30:00+01:00",
+    }
+
+
+@pytest.mark.parametrize(
+    ("status", "key"), [(409, "conflict"), (422, "invalid_request"), (500, "backend_error")]
+)
+async def test_confirm_activity_errors(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    init_integration: MockConfigEntry,
+    status: int,
+    key: str,
+) -> None:
+    """409 (not to_confirm), 422 (invalid) and server errors are translated."""
+    aioclient_mock.post(
+        f"{BASE}/v1/activities/act-1/confirm", status=status, json={"detail": "nope"}
+    )
+    with pytest.raises(HomeAssistantError) as err:
+        await hass.services.async_call(
+            DOMAIN,
+            "confirm_activity",
+            {"activity_id": "act-1", "duration_minutes": 30},
+            blocking=True,
+        )
+    assert err.value.translation_key == key
+    assert isinstance(err.value, ServiceValidationError) == (status != 500)
+
+
+async def test_confirm_activity_rejects_bad_duration(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    """duration_minutes must be a positive integer."""
+    import voluptuous as vol
+
+    with pytest.raises(vol.Invalid):
+        await hass.services.async_call(
+            DOMAIN,
+            "confirm_activity",
+            {"activity_id": "act-2", "duration_minutes": 0},
+            blocking=True,
+        )
+
+
+async def test_interpret_answer(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, init_integration: MockConfigEntry
+) -> None:
+    """Questions are answered with action 'answer' and nothing is refreshed."""
+    aioclient_mock.post(
+        f"{BASE}/v1/interpret",
+        json={
+            "understood": True,
+            "action": "answer",
+            "summary": "Demain : Algèbre à 10:00.",
+            "applied": False,
+            "used_llm": False,
+        },
+    )
+    before = len(calls(aioclient_mock, "GET", "/v1/summary"))
+    response = await hass.services.async_call(
+        DOMAIN,
+        "interpret",
+        {"text": "qu'est-ce que j'ai demain ?"},
+        blocking=True,
+        return_response=True,
+    )
+    assert response == {
+        "understood": True,
+        "action": "answer",
+        "summary": "Demain : Algèbre à 10:00.",
+        "applied": False,
+        "used_llm": False,
+    }
+    await hass.async_block_till_done()
+    assert len(calls(aioclient_mock, "GET", "/v1/summary")) == before

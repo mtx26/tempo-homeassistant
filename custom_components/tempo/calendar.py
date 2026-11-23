@@ -26,6 +26,13 @@ TYPE_LABELS = {
     "travel": "Trajet",
 }
 
+STUDY_STATE_LABELS = {
+    "planned": "planifié",
+    "missed": "manqué",
+    "done": "fait",
+    "promoted": "promu",
+}
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -63,6 +70,9 @@ def describe_item(item: dict[str, Any]) -> str:
     lines.append("Horaire fixe" if item.get("fixed") else "Déplaçable par Tempo")
     if item.get("locked"):
         lines.append("Verrouillé")
+    if kind == "study" and item.get("state"):
+        state = str(item["state"])
+        lines.append(f"État : {STUDY_STATE_LABELS.get(state, state)}")
     if item.get("location"):
         lines.append(f"Lieu : {item['location']}")
     if kind == "travel":

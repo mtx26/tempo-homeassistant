@@ -89,3 +89,36 @@ async def test_departure_falls_back_to_travel(
     mock_backend(aioclient_mock, summary=summary, notifications=[])
     await setup_entry(hass, mock_config_entry)
     assert hass.states.get("sensor.tempo_next_departure").state == "2026-11-23T08:20:00+00:00"  # type: ignore[union-attr]
+
+
+async def test_trainings_to_confirm(hass: HomeAssistant, init_integration: MockConfigEntry) -> None:
+    """Only activities with status to_confirm are counted and listed."""
+    state = hass.states.get("sensor.tempo_trainings_to_confirm")
+    assert state is not None
+    assert state.state == "2"
+    assert state.attributes["activities"] == [
+        {
+            "id": "act-2",
+            "title": "Fractionné 10x400",
+            "preferred_day": "2026-11-25",
+            "kind": "training",
+        },
+        {
+            "id": "act-3",
+            "title": "Cross de Bruxelles",
+            "preferred_day": "2026-11-29",
+            "kind": "race",
+        },
+    ]
+
+
+async def test_trainings_to_confirm_empty(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, mock_config_entry: MockConfigEntry
+) -> None:
+    """No activity to confirm gives 0 and an empty list."""
+    mock_backend(aioclient_mock, activities=[])
+    await setup_entry(hass, mock_config_entry)
+    state = hass.states.get("sensor.tempo_trainings_to_confirm")
+    assert state is not None
+    assert state.state == "0"
+    assert state.attributes["activities"] == []

@@ -144,6 +144,24 @@ def _proposal_attrs(data: TempoData) -> dict[str, Any]:
     }
 
 
+def _to_confirm(data: TempoData) -> list[dict[str, Any]]:
+    return [a for a in data.activities if a.get("status") == "to_confirm"]
+
+
+def _to_confirm_attrs(data: TempoData) -> dict[str, Any]:
+    return {
+        "activities": [
+            {
+                "id": a.get("id"),
+                "title": a.get("title"),
+                "preferred_day": a.get("preferred_day"),
+                "kind": a.get("kind"),
+            }
+            for a in _to_confirm(data)
+        ]
+    }
+
+
 def _issues_attrs(data: TempoData) -> dict[str, Any]:
     summary = _summary(data)
     return {
@@ -210,6 +228,13 @@ SENSORS: tuple[TempoSensorEntityDescription, ...] = (
         translation_key="unread_notifications",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=_int("unread_notifications"),
+    ),
+    TempoSensorEntityDescription(
+        key="trainings_to_confirm",
+        translation_key="trainings_to_confirm",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: len(_to_confirm(data)),
+        attrs_fn=_to_confirm_attrs,
     ),
     TempoSensorEntityDescription(
         key="issues",

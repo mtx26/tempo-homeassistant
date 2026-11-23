@@ -19,7 +19,7 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.util import dt as dt_util
 
-from .api import TempoConflictError, TempoError, TempoNotFoundError
+from .api import TempoApiError, TempoConflictError, TempoError, TempoNotFoundError
 from .const import DOMAIN
 from .coordinator import TempoConfigEntry
 
@@ -38,6 +38,7 @@ SERVICE_SET_PLACE = "set_place"
 SERVICE_SET_AVAILABILITY = "set_availability"
 SERVICE_ACKNOWLEDGE_NOTIFICATION = "acknowledge_notification"
 SERVICE_INTERPRET = "interpret"
+SERVICE_CONFIRM_ACTIVITY = "confirm_activity"
 
 _ENTRY: dict[vol.Marker, Any] = {vol.Optional(ATTR_CONFIG_ENTRY_ID): cv.string}
 _ID = vol.All(cv.string, vol.Length(min=1, max=200))
@@ -102,6 +103,14 @@ WINDOW_SCHEMA = vol.Schema(
 SET_AVAILABILITY_SCHEMA = vol.Schema(
     {**_ENTRY, vol.Required("windows"): vol.All(cv.ensure_list, [WINDOW_SCHEMA])}
 )
+CONFIRM_ACTIVITY_SCHEMA = vol.Schema(
+    {
+        **_ENTRY,
+        vol.Required("activity_id"): _ID,
+        vol.Required("duration_minutes"): _MINUTES,
+        vol.Optional("start"): cv.datetime,
+    }
+)
 INTERPRET_SCHEMA = vol.Schema(
     {**_ENTRY, vol.Required("text"): vol.All(cv.string, vol.Length(min=1, max=2000))}
 )
@@ -153,6 +162,18 @@ async def _run[T](entry: TempoConfigEntry, call: Awaitable[T], refresh: bool = T
         raise ServiceValidationError(
             translation_domain=DOMAIN,
             translation_key="conflict",
+            translation_placeholders={"error": str(err)},
+        ) from err
+    except TempoApiError as err:
+        if err.status != 422:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="backend_error",
+                translation_placeholders={"error": str(err)},
+            ) from err
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="invalid_request",
             translation_placeholders={"error": str(err)},
         ) from err
     except TempoError as err:
@@ -237,6 +258,24 @@ async def _add_race(hass: HomeAssistant, call: ServiceCall) -> None:
     await _run(entry, entry.runtime_data.client.create_activity(payload))
 
 
+async def _confirm_activity(hass: HomeAssistant, call: ServiceCall) -> None:
+    entry = _entry(hass, call)
+    activity_id: str = call.data["activity_id"]
+    data = entry.runtime_data.coordinator.data
+    known = next(
+        (a for a in (data.activities if data else []) if str(a.get("id")) == activity_id),
+        None,
+    )
+    if known is not None and known.get("kind") == "race" and "start" not in call.data:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="race_start_required"
+        )
+    payload: dict[str, Any] = {"duration_minutes": call.data["duration_minutes"]}
+    if "start" in call.data:
+        payload["start"] = _iso(call.data["start"])
+    await _run(entry, entry.runtime_data.client.confirm_activity(activity_id, payload))
+
+
 async def _set_place(hass: HomeAssistant, call: ServiceCall) -> None:
     entry = _entry(hass, call)
     payload = {
@@ -285,6 +324,7 @@ async def _interpret(hass: HomeAssistant, call: ServiceCall) -> ServiceResponse:
         "action": result.get("action"),
         "summary": str(result.get("summary") or ""),
         "applied": bool(result.get("applied")),
+        "used_llm": bool(result.get("used_llm")),
     }
 
 
@@ -317,4 +357,5 @@ def async_setup_services(hass: HomeAssistant) -> None:
     register(SERVICE_SET_PLACE, _set_place, SET_PLACE_SCHEMA)
     register(SERVICE_SET_AVAILABILITY, _set_availability, SET_AVAILABILITY_SCHEMA)
     register(SERVICE_ACKNOWLEDGE_NOTIFICATION, _acknowledge, NOTIFICATION_SCHEMA)
+    register(SERVICE_CONFIRM_ACTIVITY, _confirm_activity, CONFIRM_ACTIVITY_SCHEMA)
     register(SERVICE_INTERPRET, _interpret, INTERPRET_SCHEMA, SupportsResponse.OPTIONAL)
