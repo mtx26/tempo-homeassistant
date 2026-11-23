@@ -29,8 +29,12 @@ async def test_setup_and_unload(
     assert schedule.query["start"].startswith("2026-11-22T08:00:00")
     assert schedule.query["end"].startswith("2026-12-07T08:00:00")
 
-    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, init_integration.entry_id)})
-    assert device is not None
+    # async_entries_for_config_entry exists on every supported HA version (async_get_device
+    # is deprecated since 2026.10).
+    devices = dr.async_entries_for_config_entry(dr.async_get(hass), init_integration.entry_id)
+    assert len(devices) == 1
+    device = devices[0]
+    assert (DOMAIN, init_integration.entry_id) in device.identifiers
     assert device.name == "Tempo"
     assert device.sw_version == "0.6.0"
     assert device.entry_type is dr.DeviceEntryType.SERVICE
