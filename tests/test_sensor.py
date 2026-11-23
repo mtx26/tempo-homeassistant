@@ -45,6 +45,7 @@ async def test_sensor_states(hass: HomeAssistant, init_integration: MockConfigEn
     assert plan is not None
     assert plan.state == "partial"
     assert plan.attributes["unplanned_minutes"] == 30
+    assert plan.attributes["missed_blocks"] == 2
 
     proposals = hass.states.get("sensor.tempo_pending_approvals")
     assert proposals is not None

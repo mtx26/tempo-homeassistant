@@ -30,6 +30,7 @@ SUMMARY: dict[str, Any] = {
     "issues": ["Analyse: 30 min could not be planned before the soft target"],
     "warnings": ["Realtime data unavailable for STIB"],
     "unplanned_minutes": 30,
+    "missed_blocks": 2,
     "next_event": {
         "type": "class",
         "id": "class-1",

@@ -121,6 +121,7 @@ def _plan_attrs(data: TempoData) -> dict[str, Any]:
     return {
         "planned_at": summary.get("planned_at"),
         "unplanned_minutes": summary.get("unplanned_minutes"),
+        "missed_blocks": summary.get("missed_blocks", 0),
         "warnings": list(summary.get("warnings") or []),
     }
 
