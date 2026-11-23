@@ -1,0 +1,195 @@
+add_task:
+  fields:
+    config_entry_id: &entry
+      required: false
+      selector:
+        config_entry:
+          integration: tempo
+    subject:
+      required: true
+      example: "Analyse"
+      selector:
+        text:
+    effort_minutes:
+      required: true
+      example: 120
+      selector:
+        number:
+          min: 1
+          max: 43200
+          unit_of_measurement: min
+          mode: box
+    target_date:
+      required: true
+      selector:
+        date:
+    hard_deadline:
+      required: false
+      default: false
+      selector:
+        boolean:
+
+replan:
+  fields:
+    config_entry_id: *entry
+
+approve_proposal:
+  fields:
+    config_entry_id: *entry
+    proposal_id: &proposal
+      required: true
+      selector:
+        text:
+
+reject_proposal:
+  fields:
+    config_entry_id: *entry
+    proposal_id: *proposal
+
+lock_block:
+  fields:
+    config_entry_id: *entry
+    block_id: &block
+      required: true
+      selector:
+        text:
+
+unlock_block:
+  fields:
+    config_entry_id: *entry
+    block_id: *block
+
+complete_block:
+  fields:
+    config_entry_id: *entry
+    block_id: *block
+
+add_training:
+  fields:
+    config_entry_id: *entry
+    title:
+      required: true
+      example: "Endurance 10 km"
+      selector:
+        text:
+    duration_minutes:
+      required: true
+      example: 60
+      selector:
+        number:
+          min: 1
+          max: 43200
+          unit_of_measurement: min
+          mode: box
+    start:
+      required: false
+      selector:
+        datetime:
+    earliest_start:
+      required: false
+      selector:
+        datetime:
+    latest_end:
+      required: false
+      selector:
+        datetime:
+    notes:
+      required: false
+      selector:
+        text:
+          multiline: true
+    place_id: &place
+      required: false
+      example: "track"
+      selector:
+        text:
+
+add_race:
+  fields:
+    config_entry_id: *entry
+    title:
+      required: true
+      example: "Corrida"
+      selector:
+        text:
+    start:
+      required: true
+      selector:
+        datetime:
+    duration_minutes:
+      required: true
+      example: 90
+      selector:
+        number:
+          min: 1
+          max: 43200
+          unit_of_measurement: min
+          mode: box
+    place_id: *place
+    notes:
+      required: false
+      selector:
+        text:
+          multiline: true
+
+set_place:
+  fields:
+    config_entry_id: *entry
+    place_id:
+      required: true
+      example: "campus"
+      selector:
+        text:
+    name:
+      required: true
+      example: "Campus"
+      selector:
+        text:
+    latitude:
+      required: true
+      selector:
+        number:
+          min: -90
+          max: 90
+          step: any
+          mode: box
+    longitude:
+      required: true
+      selector:
+        number:
+          min: -180
+          max: 180
+          step: any
+          mode: box
+    aliases:
+      required: false
+      selector:
+        text:
+          multiple: true
+
+set_availability:
+  fields:
+    config_entry_id: *entry
+    windows:
+      required: true
+      example: '[{"weekday": 0, "start": "08:00", "end": "18:00", "place_id": "home"}]'
+      selector:
+        object:
+
+acknowledge_notification:
+  fields:
+    config_entry_id: *entry
+    notification_id:
+      required: true
+      selector:
+        text:
+
+interpret:
+  fields:
+    config_entry_id: *entry
+    text:
+      required: true
+      example: "Ajoute 2 h de révision d'analyse avant vendredi"
+      selector:
+        text:
+          multiline: true

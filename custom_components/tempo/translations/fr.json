@@ -1,0 +1,248 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connexion à Tempo",
+        "description": "Indiquez l'URL interne du backend Tempo privé et son jeton de service.",
+        "data": {
+          "url": "URL du backend",
+          "api_token": "Jeton de service",
+          "verify_ssl": "Vérifier le certificat SSL"
+        },
+        "data_description": {
+          "url": "Par exemple http://tempo-api:8000. N'exposez jamais Tempo publiquement.",
+          "api_token": "Jeton Bearer configuré dans le backend Tempo.",
+          "verify_ssl": "À désactiver uniquement pour un certificat auto-signé sur un réseau de confiance."
+        }
+      },
+      "tracker": {
+        "title": "Position du téléphone",
+        "description": "Choisissez le traceur du téléphone utilisé comme position réelle.",
+        "data": {
+          "tracker_entity_id": "Traceur du téléphone"
+        },
+        "data_description": {
+          "tracker_entity_id": "Ses coordonnées sont envoyées à Tempo pour calculer les départs."
+        }
+      },
+      "reauth_confirm": {
+        "title": "Jeton Tempo refusé",
+        "description": "Le jeton pour {url} a été refusé. Saisissez un nouveau jeton de service.",
+        "data": {
+          "api_token": "Jeton de service"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Impossible de se connecter au backend Tempo.",
+      "invalid_auth": "Jeton invalide.",
+      "rate_limited": "Trop de tentatives échouées. Patientez un moment puis réessayez.",
+      "invalid_url": "URL invalide (http ou https requis).",
+      "unknown": "Erreur inattendue."
+    },
+    "abort": {
+      "already_configured": "Ce backend Tempo est déjà configuré.",
+      "reauth_successful": "La réauthentification a réussi."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options de Tempo",
+        "data": {
+          "tracker_entity_id": "Traceur du téléphone",
+          "scan_interval": "Intervalle d'interrogation",
+          "notify_service": "Service de notification (facultatif)"
+        },
+        "data_description": {
+          "scan_interval": "Secondes entre deux interrogations du backend (minimum 30).",
+          "notify_service": "Par exemple notify.mobile_app_telephone, utilisé pour les approbations et les alertes de départ."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Impossible de se connecter au backend Tempo.",
+      "invalid_auth": "Jeton invalide.",
+      "rate_limited": "Trop de tentatives échouées. Patientez un moment puis réessayez.",
+      "invalid_notify_service": "Service de notification inconnu (format attendu : notify.xxx).",
+      "unknown": "Erreur inattendue."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "next_event": { "name": "Prochain événement" },
+      "next_departure": { "name": "Prochain départ" },
+      "departure_status": {
+        "name": "Statut du départ",
+        "state": {
+          "on_time": "À l'heure",
+          "leave_now": "Partir maintenant",
+          "leave_earlier": "Partir plus tôt",
+          "at_risk": "À risque",
+          "late": "En retard",
+          "impossible": "Impossible",
+          "unknown_position": "Position inconnue",
+          "unknown_routing": "Itinéraire inconnu",
+          "none": "Aucun"
+        }
+      },
+      "remaining_study": { "name": "Étude restante" },
+      "today_study": { "name": "Étude aujourd'hui" },
+      "plan_status": {
+        "name": "Statut du planning",
+        "state": {
+          "complete": "Complet",
+          "partial": "Partiel",
+          "no_solution": "Aucune solution",
+          "invalid": "Invalide",
+          "none": "Aucun"
+        }
+      },
+      "pending_proposals": { "name": "Approbations en attente" },
+      "unread_notifications": { "name": "Notifications non lues" },
+      "issues": { "name": "Problèmes de planification" }
+    },
+    "todo": {
+      "tasks": { "name": "Tâches" }
+    }
+  },
+  "exceptions": {
+    "auth_failed": { "message": "Le jeton Tempo a été refusé." },
+    "cannot_connect": { "message": "Backend Tempo injoignable : {error}" },
+    "update_failed": { "message": "Erreur lors de la mise à jour des données Tempo : {error}" },
+    "schedule_fetch_failed": { "message": "Impossible de récupérer le planning Tempo : {error}" },
+    "backend_error": { "message": "Le backend Tempo a renvoyé une erreur : {error}" },
+    "not_found": { "message": "Introuvable dans Tempo : {error}" },
+    "conflict": { "message": "Déjà décidé ou en conflit : {error}" },
+    "entry_not_found": { "message": "L'entrée de configuration Tempo {entry_id} est introuvable." },
+    "entry_not_loaded": { "message": "Aucune entrée Tempo chargée." },
+    "entry_ambiguous": { "message": "Plusieurs entrées Tempo sont chargées ; précisez config_entry_id." },
+    "invalid_window": { "message": "La fin de la plage horaire doit être après son début." },
+    "interpret_unavailable": { "message": "Ce backend Tempo ne prend pas en charge les demandes en langage naturel." },
+    "task_not_found": { "message": "Tâche {uid} introuvable." },
+    "task_subject_required": { "message": "Une tâche doit avoir une matière." },
+    "task_due_required": { "message": "Une tâche doit avoir une date cible (échéance)." }
+  },
+  "services": {
+    "add_task": {
+      "name": "Ajouter une tâche d'étude",
+      "description": "Ajoute une tâche d'étude à Tempo. La date cible est souple sauf si l'échéance stricte est activée.",
+      "fields": {
+        "config_entry_id": { "name": "Entrée de configuration", "description": "Entrée Tempo à utiliser (facultatif s'il n'y en a qu'une)." },
+        "subject": { "name": "Matière", "description": "Matière ou cours à étudier." },
+        "effort_minutes": { "name": "Effort", "description": "Effort d'étude total en minutes." },
+        "target_date": { "name": "Date cible", "description": "Date à laquelle l'étude devrait être terminée." },
+        "hard_deadline": { "name": "Échéance stricte", "description": "Traiter la date cible comme une échéance stricte au lieu d'un objectif souple." }
+      }
+    },
+    "replan": {
+      "name": "Replanifier",
+      "description": "Demande au backend Tempo de recalculer le planning (asynchrone).",
+      "fields": {
+        "config_entry_id": { "name": "Entrée de configuration", "description": "Entrée Tempo à utiliser (facultatif s'il n'y en a qu'une)." }
+      }
+    },
+    "approve_proposal": {
+      "name": "Approuver une proposition",
+      "description": "Approuve une modification d'un engagement protégé proposée par Tempo.",
+      "fields": {
+        "config_entry_id": { "name": "Entrée de configuration", "description": "Entrée Tempo à utiliser (facultatif s'il n'y en a qu'une)." },
+        "proposal_id": { "name": "ID de la proposition", "description": "Identifiant de la proposition." }
+      }
+    },
+    "reject_proposal": {
+      "name": "Refuser une proposition",
+      "description": "Refuse une modification proposée par Tempo.",
+      "fields": {
+        "config_entry_id": { "name": "Entrée de configuration", "description": "Entrée Tempo à utiliser (facultatif s'il n'y en a qu'une)." },
+        "proposal_id": { "name": "ID de la proposition", "description": "Identifiant de la proposition." }
+      }
+    },
+    "lock_block": {
+      "name": "Verrouiller un bloc d'étude",
+      "description": "Verrouille un bloc d'étude pour que Tempo ne le déplace plus.",
+      "fields": {
+        "config_entry_id": { "name": "Entrée de configuration", "description": "Entrée Tempo à utiliser (facultatif s'il n'y en a qu'une)." },
+        "block_id": { "name": "ID du bloc", "description": "Identifiant du bloc d'étude." }
+      }
+    },
+    "unlock_block": {
+      "name": "Déverrouiller un bloc d'étude",
+      "description": "Déverrouille un bloc d'étude pour que Tempo puisse à nouveau le déplacer.",
+      "fields": {
+        "config_entry_id": { "name": "Entrée de configuration", "description": "Entrée Tempo à utiliser (facultatif s'il n'y en a qu'une)." },
+        "block_id": { "name": "ID du bloc", "description": "Identifiant du bloc d'étude." }
+      }
+    },
+    "complete_block": {
+      "name": "Terminer un bloc d'étude",
+      "description": "Marque un bloc d'étude comme fait.",
+      "fields": {
+        "config_entry_id": { "name": "Entrée de configuration", "description": "Entrée Tempo à utiliser (facultatif s'il n'y en a qu'une)." },
+        "block_id": { "name": "ID du bloc", "description": "Identifiant du bloc d'étude." }
+      }
+    },
+    "add_training": {
+      "name": "Ajouter un entraînement",
+      "description": "Ajoute une séance d'entraînement flexible que Tempo peut placer.",
+      "fields": {
+        "config_entry_id": { "name": "Entrée de configuration", "description": "Entrée Tempo à utiliser (facultatif s'il n'y en a qu'une)." },
+        "title": { "name": "Titre", "description": "Nom de la séance." },
+        "duration_minutes": { "name": "Durée", "description": "Durée en minutes." },
+        "start": { "name": "Début souhaité", "description": "Heure de début préférée (facultatif)." },
+        "earliest_start": { "name": "Début au plus tôt", "description": "Début de la plage autorisée (facultatif)." },
+        "latest_end": { "name": "Fin au plus tard", "description": "Fin de la plage autorisée (facultatif)." },
+        "notes": { "name": "Notes", "description": "Notes libres." },
+        "place_id": { "name": "Lieu", "description": "Identifiant du lieu Tempo." }
+      }
+    },
+    "add_race": {
+      "name": "Ajouter une course",
+      "description": "Ajoute une course ou compétition à heure de départ fixe.",
+      "fields": {
+        "config_entry_id": { "name": "Entrée de configuration", "description": "Entrée Tempo à utiliser (facultatif s'il n'y en a qu'une)." },
+        "title": { "name": "Titre", "description": "Nom de la course." },
+        "start": { "name": "Début", "description": "Heure de départ fixe." },
+        "duration_minutes": { "name": "Durée", "description": "Durée en minutes." },
+        "place_id": { "name": "Lieu", "description": "Identifiant du lieu Tempo." },
+        "notes": { "name": "Notes", "description": "Notes libres." }
+      }
+    },
+    "set_place": {
+      "name": "Définir un lieu",
+      "description": "Crée ou remplace un lieu Tempo.",
+      "fields": {
+        "config_entry_id": { "name": "Entrée de configuration", "description": "Entrée Tempo à utiliser (facultatif s'il n'y en a qu'une)." },
+        "place_id": { "name": "ID du lieu", "description": "Identifiant composé de a-z, 0-9 et _ (50 caractères max.)." },
+        "name": { "name": "Nom", "description": "Nom affiché." },
+        "latitude": { "name": "Latitude", "description": "Latitude en degrés." },
+        "longitude": { "name": "Longitude", "description": "Longitude en degrés." },
+        "aliases": { "name": "Alias", "description": "Autres noms utilisés dans les calendriers pour ce lieu." }
+      }
+    },
+    "set_availability": {
+      "name": "Définir les disponibilités",
+      "description": "Remplace les plages hebdomadaires de disponibilité pour l'étude.",
+      "fields": {
+        "config_entry_id": { "name": "Entrée de configuration", "description": "Entrée Tempo à utiliser (facultatif s'il n'y en a qu'une)." },
+        "windows": { "name": "Plages", "description": "Liste de plages avec weekday (0 = lundi), start HH:MM, end HH:MM ou 24:00 et place_id." }
+      }
+    },
+    "acknowledge_notification": {
+      "name": "Acquitter une notification",
+      "description": "Marque une notification Tempo comme lue.",
+      "fields": {
+        "config_entry_id": { "name": "Entrée de configuration", "description": "Entrée Tempo à utiliser (facultatif s'il n'y en a qu'une)." },
+        "notification_id": { "name": "ID de la notification", "description": "Identifiant de la notification." }
+      }
+    },
+    "interpret": {
+      "name": "Interpréter une demande",
+      "description": "Envoie une demande en langage naturel à Tempo ; des règles déterministes valident toujours le résultat.",
+      "fields": {
+        "config_entry_id": { "name": "Entrée de configuration", "description": "Entrée Tempo à utiliser (facultatif s'il n'y en a qu'une)." },
+        "text": { "name": "Texte", "description": "Demande en langage naturel." }
+      }
+    }
+  }
+}

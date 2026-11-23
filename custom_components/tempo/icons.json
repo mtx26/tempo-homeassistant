@@ -1,0 +1,33 @@
+{
+  "entity": {
+    "sensor": {
+      "next_event": { "default": "mdi:calendar-clock" },
+      "next_departure": { "default": "mdi:train-bus" },
+      "departure_status": { "default": "mdi:run-fast" },
+      "remaining_study": { "default": "mdi:book-clock" },
+      "today_study": { "default": "mdi:book-open-variant" },
+      "plan_status": { "default": "mdi:calendar-check" },
+      "pending_proposals": { "default": "mdi:account-check" },
+      "unread_notifications": { "default": "mdi:bell" },
+      "issues": { "default": "mdi:alert-circle-outline" }
+    },
+    "todo": {
+      "tasks": { "default": "mdi:clipboard-list" }
+    }
+  },
+  "services": {
+    "add_task": { "service": "mdi:clipboard-plus" },
+    "replan": { "service": "mdi:calendar-refresh" },
+    "approve_proposal": { "service": "mdi:check-circle" },
+    "reject_proposal": { "service": "mdi:close-circle" },
+    "lock_block": { "service": "mdi:lock" },
+    "unlock_block": { "service": "mdi:lock-open" },
+    "complete_block": { "service": "mdi:check" },
+    "add_training": { "service": "mdi:run" },
+    "add_race": { "service": "mdi:flag-checkered" },
+    "set_place": { "service": "mdi:map-marker-plus" },
+    "set_availability": { "service": "mdi:calendar-range" },
+    "acknowledge_notification": { "service": "mdi:bell-check" },
+    "interpret": { "service": "mdi:message-text" }
+  }
+}

@@ -1,12 +1,13 @@
 {
   "domain": "tempo",
   "name": "Tempo",
-  "codeowners": ["@OWNER"],
-  "config_flow": false,
-  "documentation": "https://github.com/OWNER/tempo-homeassistant",
+  "codeowners": ["@mtx26"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/mtx26/tempo-homeassistant",
   "integration_type": "service",
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/OWNER/tempo-homeassistant/issues",
+  "issue_tracker": "https://github.com/mtx26/tempo-homeassistant/issues",
   "requirements": [],
-  "version": "0.0.1"
+  "version": "0.1.0"
 }

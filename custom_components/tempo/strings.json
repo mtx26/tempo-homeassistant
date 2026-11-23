@@ -1,0 +1,248 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Tempo",
+        "description": "Enter the internal URL of the private Tempo backend and its service token.",
+        "data": {
+          "url": "Backend URL",
+          "api_token": "Service token",
+          "verify_ssl": "Verify SSL certificate"
+        },
+        "data_description": {
+          "url": "For example http://tempo-api:8000. Never expose Tempo publicly.",
+          "api_token": "Bearer token configured in the Tempo backend.",
+          "verify_ssl": "Disable only for a self-signed certificate on a trusted network."
+        }
+      },
+      "tracker": {
+        "title": "Phone location",
+        "description": "Choose the phone device tracker used as your actual location.",
+        "data": {
+          "tracker_entity_id": "Phone device tracker"
+        },
+        "data_description": {
+          "tracker_entity_id": "Its coordinates are pushed to Tempo to compute departures."
+        }
+      },
+      "reauth_confirm": {
+        "title": "Tempo token rejected",
+        "description": "The token for {url} was rejected. Enter a new service token.",
+        "data": {
+          "api_token": "Service token"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to the Tempo backend.",
+      "invalid_auth": "Invalid token.",
+      "rate_limited": "Too many failed attempts. Wait a moment and try again.",
+      "invalid_url": "Invalid URL (http or https required).",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "This Tempo backend is already configured.",
+      "reauth_successful": "Re-authentication was successful."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Tempo options",
+        "data": {
+          "tracker_entity_id": "Phone device tracker",
+          "scan_interval": "Polling interval",
+          "notify_service": "Notify service (optional)"
+        },
+        "data_description": {
+          "scan_interval": "Seconds between two polls of the backend (minimum 30).",
+          "notify_service": "For example notify.mobile_app_phone, used for approvals and departure alerts."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to the Tempo backend.",
+      "invalid_auth": "Invalid token.",
+      "rate_limited": "Too many failed attempts. Wait a moment and try again.",
+      "invalid_notify_service": "Unknown notify service (expected notify.xxx).",
+      "unknown": "Unexpected error."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "next_event": { "name": "Next event" },
+      "next_departure": { "name": "Next departure" },
+      "departure_status": {
+        "name": "Departure status",
+        "state": {
+          "on_time": "On time",
+          "leave_now": "Leave now",
+          "leave_earlier": "Leave earlier",
+          "at_risk": "At risk",
+          "late": "Late",
+          "impossible": "Impossible",
+          "unknown_position": "Unknown position",
+          "unknown_routing": "Unknown routing",
+          "none": "None"
+        }
+      },
+      "remaining_study": { "name": "Remaining study" },
+      "today_study": { "name": "Study today" },
+      "plan_status": {
+        "name": "Plan status",
+        "state": {
+          "complete": "Complete",
+          "partial": "Partial",
+          "no_solution": "No solution",
+          "invalid": "Invalid",
+          "none": "None"
+        }
+      },
+      "pending_proposals": { "name": "Pending approvals" },
+      "unread_notifications": { "name": "Unread notifications" },
+      "issues": { "name": "Planning issues" }
+    },
+    "todo": {
+      "tasks": { "name": "Tasks" }
+    }
+  },
+  "exceptions": {
+    "auth_failed": { "message": "The Tempo token was rejected." },
+    "cannot_connect": { "message": "Cannot reach the Tempo backend: {error}" },
+    "update_failed": { "message": "Error while updating Tempo data: {error}" },
+    "schedule_fetch_failed": { "message": "Could not fetch the Tempo schedule: {error}" },
+    "backend_error": { "message": "The Tempo backend returned an error: {error}" },
+    "not_found": { "message": "Not found in Tempo: {error}" },
+    "conflict": { "message": "Already decided or conflicting: {error}" },
+    "entry_not_found": { "message": "Tempo config entry {entry_id} was not found." },
+    "entry_not_loaded": { "message": "No loaded Tempo config entry." },
+    "entry_ambiguous": { "message": "Several Tempo entries are loaded; specify config_entry_id." },
+    "invalid_window": { "message": "The end of the time window must be after its start." },
+    "interpret_unavailable": { "message": "This Tempo backend does not support natural-language requests." },
+    "task_not_found": { "message": "Task {uid} was not found." },
+    "task_subject_required": { "message": "A task needs a subject." },
+    "task_due_required": { "message": "A task needs a target date (due date)." }
+  },
+  "services": {
+    "add_task": {
+      "name": "Add study task",
+      "description": "Adds a study task to Tempo. The target date is flexible unless hard deadline is set.",
+      "fields": {
+        "config_entry_id": { "name": "Config entry", "description": "Tempo entry to use (optional when only one exists)." },
+        "subject": { "name": "Subject", "description": "Subject or course to study." },
+        "effort_minutes": { "name": "Effort", "description": "Total study effort in minutes." },
+        "target_date": { "name": "Target date", "description": "Date by which the study should be done." },
+        "hard_deadline": { "name": "Hard deadline", "description": "Treat the target date as a strict deadline instead of a soft target." }
+      }
+    },
+    "replan": {
+      "name": "Replan",
+      "description": "Asks the Tempo backend to recompute the plan (asynchronous).",
+      "fields": {
+        "config_entry_id": { "name": "Config entry", "description": "Tempo entry to use (optional when only one exists)." }
+      }
+    },
+    "approve_proposal": {
+      "name": "Approve proposal",
+      "description": "Approves a change to a protected commitment proposed by Tempo.",
+      "fields": {
+        "config_entry_id": { "name": "Config entry", "description": "Tempo entry to use (optional when only one exists)." },
+        "proposal_id": { "name": "Proposal ID", "description": "Identifier of the proposal." }
+      }
+    },
+    "reject_proposal": {
+      "name": "Reject proposal",
+      "description": "Rejects a change proposed by Tempo.",
+      "fields": {
+        "config_entry_id": { "name": "Config entry", "description": "Tempo entry to use (optional when only one exists)." },
+        "proposal_id": { "name": "Proposal ID", "description": "Identifier of the proposal." }
+      }
+    },
+    "lock_block": {
+      "name": "Lock study block",
+      "description": "Locks a study block so Tempo no longer moves it.",
+      "fields": {
+        "config_entry_id": { "name": "Config entry", "description": "Tempo entry to use (optional when only one exists)." },
+        "block_id": { "name": "Block ID", "description": "Identifier of the study block." }
+      }
+    },
+    "unlock_block": {
+      "name": "Unlock study block",
+      "description": "Unlocks a study block so Tempo can move it again.",
+      "fields": {
+        "config_entry_id": { "name": "Config entry", "description": "Tempo entry to use (optional when only one exists)." },
+        "block_id": { "name": "Block ID", "description": "Identifier of the study block." }
+      }
+    },
+    "complete_block": {
+      "name": "Complete study block",
+      "description": "Marks a study block as done.",
+      "fields": {
+        "config_entry_id": { "name": "Config entry", "description": "Tempo entry to use (optional when only one exists)." },
+        "block_id": { "name": "Block ID", "description": "Identifier of the study block." }
+      }
+    },
+    "add_training": {
+      "name": "Add training",
+      "description": "Adds a flexible training session that Tempo can place.",
+      "fields": {
+        "config_entry_id": { "name": "Config entry", "description": "Tempo entry to use (optional when only one exists)." },
+        "title": { "name": "Title", "description": "Name of the session." },
+        "duration_minutes": { "name": "Duration", "description": "Duration in minutes." },
+        "start": { "name": "Preferred start", "description": "Preferred start time (optional)." },
+        "earliest_start": { "name": "Earliest start", "description": "Start of the allowed window (optional)." },
+        "latest_end": { "name": "Latest end", "description": "End of the allowed window (optional)." },
+        "notes": { "name": "Notes", "description": "Free-form notes." },
+        "place_id": { "name": "Place", "description": "Identifier of the Tempo place." }
+      }
+    },
+    "add_race": {
+      "name": "Add race",
+      "description": "Adds a race or competition with a fixed start time.",
+      "fields": {
+        "config_entry_id": { "name": "Config entry", "description": "Tempo entry to use (optional when only one exists)." },
+        "title": { "name": "Title", "description": "Name of the race." },
+        "start": { "name": "Start", "description": "Fixed start time." },
+        "duration_minutes": { "name": "Duration", "description": "Duration in minutes." },
+        "place_id": { "name": "Place", "description": "Identifier of the Tempo place." },
+        "notes": { "name": "Notes", "description": "Free-form notes." }
+      }
+    },
+    "set_place": {
+      "name": "Set place",
+      "description": "Creates or replaces a Tempo place.",
+      "fields": {
+        "config_entry_id": { "name": "Config entry", "description": "Tempo entry to use (optional when only one exists)." },
+        "place_id": { "name": "Place ID", "description": "Slug made of a-z, 0-9 and _ (max 50)." },
+        "name": { "name": "Name", "description": "Display name." },
+        "latitude": { "name": "Latitude", "description": "Latitude in degrees." },
+        "longitude": { "name": "Longitude", "description": "Longitude in degrees." },
+        "aliases": { "name": "Aliases", "description": "Other names used in calendars for this place." }
+      }
+    },
+    "set_availability": {
+      "name": "Set availability",
+      "description": "Replaces the weekly study availability windows.",
+      "fields": {
+        "config_entry_id": { "name": "Config entry", "description": "Tempo entry to use (optional when only one exists)." },
+        "windows": { "name": "Windows", "description": "List of windows with weekday (0 = Monday), start HH:MM, end HH:MM or 24:00 and place_id." }
+      }
+    },
+    "acknowledge_notification": {
+      "name": "Acknowledge notification",
+      "description": "Marks a Tempo notification as read.",
+      "fields": {
+        "config_entry_id": { "name": "Config entry", "description": "Tempo entry to use (optional when only one exists)." },
+        "notification_id": { "name": "Notification ID", "description": "Identifier of the notification." }
+      }
+    },
+    "interpret": {
+      "name": "Interpret request",
+      "description": "Sends a natural-language request to Tempo; deterministic rules still validate the result.",
+      "fields": {
+        "config_entry_id": { "name": "Config entry", "description": "Tempo entry to use (optional when only one exists)." },
+        "text": { "name": "Text", "description": "Request in natural language." }
+      }
+    }
+  }
+}
