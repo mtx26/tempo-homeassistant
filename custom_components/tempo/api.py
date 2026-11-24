@@ -149,7 +149,7 @@ class TempoApiClient:
         """GET /v1/tasks."""
         return cast(list[dict[str, Any]], await self._get("/v1/tasks"))
 
-    # --- location / places / availability / settings -------------------------------------
+    # --- location / places / settings -------------------------------------
 
     async def post_location(self, payload: dict[str, Any]) -> None:
         """POST /v1/location."""
@@ -158,10 +158,6 @@ class TempoApiClient:
     async def places(self) -> list[dict[str, Any]]:
         """GET /v1/places."""
         return cast(list[dict[str, Any]], await self._get("/v1/places"))
-
-    async def availability(self) -> list[dict[str, Any]]:
-        """GET /v1/availability."""
-        return cast(list[dict[str, Any]], await self._get("/v1/availability"))
 
     async def settings(self) -> dict[str, Any]:
         """GET /v1/settings."""
