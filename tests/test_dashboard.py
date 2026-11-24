@@ -34,6 +34,7 @@ CORE_CARDS = {
     "conditional",
     "vertical-stack",
     "grid",
+    "button",
 }
 
 
@@ -63,8 +64,9 @@ def test_build_dashboard_config_uses_only_core_cards() -> None:
     cards = _cards(config)
     assert {card["type"] for card in cards} <= CORE_CARDS
     text = repr(config)
-    for entity_id in ALL_ENTITIES.values():
-        assert entity_id in text, entity_id
+    for key, entity_id in ALL_ENTITIES.items():
+        if key not in ("approve_oldest_proposal", "reject_oldest_proposal"):
+            assert entity_id in text, entity_id
     headings = [c["heading"] for c in cards if c["type"] == "heading"]
     assert headings == [
         "Agenda",
@@ -73,6 +75,7 @@ def test_build_dashboard_config_uses_only_core_cards() -> None:
         "Entraînements à confirmer",
         "Approbations",
         "État du planning",
+        "Configuration",
     ]
     calendar = next(c for c in cards if c["type"] == "calendar")
     assert calendar["entities"] == ["calendar.tempo_calendar"]
@@ -84,11 +87,9 @@ def test_build_dashboard_config_uses_only_core_cards() -> None:
         for c in cards
         if c.get("tap_action", {}).get("perform_action") == "button.press"
     ]
-    assert pressed == [
-        "button.tempo_approve_oldest_proposal",
-        "button.tempo_reject_oldest_proposal",
-        "button.tempo_replan",
-    ]
+    # The "oldest proposal" buttons are not on the dashboard (their target may change
+    # after the page was loaded); explicit per-proposal actions are used instead.
+    assert pressed == ["button.tempo_replan"]
     # Approvals and trainings-to-confirm details are hidden when the count is 0.
     conditionals = [c for c in cards if c["type"] == "conditional"]
     assert {c["conditions"][0]["entity"] for c in conditionals} == {
@@ -99,12 +100,12 @@ def test_build_dashboard_config_uses_only_core_cards() -> None:
 
 
 def test_build_dashboard_config_english_and_partial() -> None:
-    """English texts; sections without entities are dropped."""
+    """English texts; sections without entities are dropped (configuration help stays)."""
     config = build_dashboard_config({"calendar": "calendar.tempo"}, "en")
     sections = config["views"][0]["sections"]
-    assert len(sections) == 1
-    assert sections[0]["cards"][0]["heading"] == "Agenda"
-    assert build_dashboard_config({}, None)["views"][0]["sections"] == []
+    assert [s["cards"][0]["heading"] for s in sections] == ["Agenda", "Configuration"]
+    empty = build_dashboard_config({}, None)["views"][0]["sections"]
+    assert [s["cards"][0]["heading"] for s in empty] == ["Configuration"]
 
 
 async def test_resolve_entities(hass: HomeAssistant, init_integration: MockConfigEntry) -> None:
@@ -226,6 +227,126 @@ async def test_markdown_templates_render(
     assert "Bus 71 delayed" in text
     assert "Fractionné 10x400" in text
     assert "`act-3`" in text
+    assert "Domicile : Kot" in text
+    assert "Horizon : 14 jours" in text
+    assert "Marge : 10 min" in text
+    assert "Parents : 2026-12-20T10:00:00+01:00 → 2026-12-27T18:00:00+01:00" in text
+    assert "Kot (`home`)" in text
     assert "Déplacer l'entraînement accepté" in text
     assert "Séances d'étude manquées : 2" in text
     assert "Realtime data unavailable for STIB" in text
+
+
+def test_per_proposal_actions_with_confirmation() -> None:
+    """Each pending proposal gets approve/reject actions with its id and a confirmation."""
+    proposals = [
+        {"id": "prop-1", "title": "Déplacer\nFooting", "created_at": "2026-11-23T07:00"},
+        {"id": "prop-2", "title": "Course", "created_at": "2026-11-23T08:00"},
+    ]
+    config = build_dashboard_config(ALL_ENTITIES, "fr", proposals, "entry-1")
+    actions = [
+        c["tap_action"]
+        for c in _cards(config)
+        if c.get("tap_action", {}).get("perform_action", "").endswith("_proposal")
+    ]
+    assert [(a["perform_action"], a["data"]["proposal_id"]) for a in actions] == [
+        ("tempo.approve_proposal", "prop-1"),
+        ("tempo.reject_proposal", "prop-1"),
+        ("tempo.approve_proposal", "prop-2"),
+        ("tempo.reject_proposal", "prop-2"),
+    ]
+    assert all(a["data"]["config_entry_id"] == "entry-1" for a in actions)
+    assert actions[0]["confirmation"]["text"] == "Approuver la proposition « Déplacer Footing » ?"
+    assert actions[3]["confirmation"]["text"] == "Refuser la proposition « Course » ?"
+    # Every Tempo action of the dashboard asks for confirmation.
+    for card in _cards(config):
+        action = card.get("tap_action", {})
+        if action.get("perform_action", "").startswith("tempo."):
+            assert action["confirmation"]["text"]
+
+
+async def test_backend_strings_are_escaped(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, mock_config_entry: MockConfigEntry
+) -> None:
+    """Links, images, HTML and headings from backend strings are neutralized."""
+    from copy import deepcopy
+
+    from homeassistant.helpers.template import Template
+
+    from .conftest import PROPOSALS, SUMMARY
+
+    evil = "![x](http://evil/i.png) [click](http://evil) <img src=x> # h *b* `c`"
+    summary = deepcopy(SUMMARY)
+    summary["issues"] = [evil]
+    summary["warnings"] = []
+    summary["departure_check"]["reason"] = evil
+    summary["departure_check"]["warnings"] = [f"STIB: {evil}"]
+    summary["next_departure"]["legs"][1]["to"] = evil
+    proposals = [{**PROPOSALS[0], "title": evil, "id": "p`1"}]
+    mock_backend(aioclient_mock, summary=summary, proposals=proposals)
+    await setup_entry(hass, mock_config_entry)
+
+    config = build_dashboard_config(async_resolve_entities(hass, mock_config_entry.entry_id), "en")
+    rendered = [
+        Template(card["content"], hass).async_render(parse_result=False)
+        for card in _cards(config)
+        if card["type"] == "markdown"
+    ]
+    text = "\n".join(rendered)
+    escaped = (
+        r"\!\[x\]\(http://evil/i.png\) \[click\]\(http://evil\) \<img src=x\> \# h \*b\* \`c\`"
+    )
+    # issue, reason, STIB warning, leg destination (twice: header + leg), proposal title
+    assert text.count(escaped) == 6, text
+    assert "![x]" not in text.replace(r"\!\[x\]", "")
+    assert "<img" not in text.replace(r"\<img", "")
+    assert "`p1`" in text  # identifiers cannot break out of their code span
+
+
+async def test_dashboard_require_admin_option(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    lovelace: None,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """The panel is public by default and admin-only when the option is set."""
+    from custom_components.tempo.const import CONF_DASHBOARD_REQUIRE_ADMIN
+
+    mock_backend(aioclient_mock)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id=mock_config_entry.unique_id,
+        data=dict(mock_config_entry.data),
+        options={CONF_DASHBOARD: True, CONF_DASHBOARD_REQUIRE_ADMIN: True},
+    )
+    await setup_entry(hass, entry)
+    assert hass.data[DATA_PANELS][DASHBOARD_URL_PATH].require_admin is True
+    assert hass.data[LOVELACE_DATA].dashboards[DASHBOARD_URL_PATH].config["require_admin"]
+
+    hass.config_entries.async_update_entry(entry, options={CONF_DASHBOARD: True})
+    await hass.services.async_call(DOMAIN, "install_dashboard", {}, blocking=True)
+    assert hass.data[DATA_PANELS][DASHBOARD_URL_PATH].require_admin is False
+
+
+async def test_lovelace_updated_when_proposals_change(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    lovelace: None,
+    init_integration: MockConfigEntry,
+) -> None:
+    """Open dashboards are told to reload when the pending proposals change."""
+    from pytest_homeassistant_custom_component.common import async_capture_events
+
+    from .conftest import PROPOSALS, poll
+
+    await hass.services.async_call(DOMAIN, "install_dashboard", {}, blocking=True)
+    events = async_capture_events(hass, "lovelace_updated")
+    await poll(hass)
+    assert events == []
+    aioclient_mock.clear_requests()
+    mock_backend(
+        aioclient_mock,
+        proposals=[*PROPOSALS, {**PROPOSALS[0], "id": "prop-2", "title": "Autre"}],
+    )
+    await poll(hass)
+    assert [e.data for e in events] == [{"url_path": DASHBOARD_URL_PATH}]

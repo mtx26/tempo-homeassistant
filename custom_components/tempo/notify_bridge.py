@@ -5,12 +5,19 @@
 * pending proposals are pushed once to the optional notify service as actionable mobile
   notifications (``TEMPO_APPROVE_<id>`` / ``TEMPO_REJECT_<id>``);
 * departure alerts are raised once per (event, status);
-* ``mobile_app_notification_action`` events approve or reject the proposal.
+* ``mobile_app_notification_action`` events approve or reject the proposal, but only for
+  proposal ids that this bridge itself sent in a notification during the last
+  :data:`SENT_PROPOSAL_TTL` (other ids are ignored), and only when the event comes from a
+  real, active, non-system Home Assistant user if it carries a ``user_id``. Any phone of the
+  household registered in the mobile app (and receiving the notification) can therefore
+  approve.
 """
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
+from datetime import timedelta
 from typing import Any
 
 from homeassistant.components import persistent_notification
@@ -28,6 +35,8 @@ from .const import (
     MOBILE_ACTION_EVENT,
 )
 from .coordinator import TempoConfigEntry, TempoCoordinator
+
+SENT_PROPOSAL_TTL = timedelta(hours=48)
 
 DEPARTURE_TEXT = {
     "leave_now": "Partez maintenant",
@@ -49,6 +58,8 @@ class TempoNotificationBridge:
         self._coordinator = coordinator
         self._surfaced: set[str] = set()
         self._notified_proposals: set[str] = set()
+        # proposal id -> monotonic time it was sent in an actionable notification.
+        self._sent: dict[str, float] = {}
         self._departure_alerts: set[tuple[str, str]] = set()
         self._unsubs: list[Callable[[], None]] = []
 
@@ -123,7 +134,16 @@ class TempoNotificationBridge:
             ],
         }
         title = f"Tempo : {proposal.get('title') or 'modification à approuver'}"
+        self._sent[proposal_id] = time.monotonic()
         self._call_notify(service, title, message, data)
+
+    def _was_sent(self, proposal_id: str) -> bool:
+        """True if this bridge sent ``proposal_id`` recently (expired ids are dropped)."""
+        now = time.monotonic()
+        ttl = SENT_PROPOSAL_TTL.total_seconds()
+        for key in [k for k, sent_at in self._sent.items() if now - sent_at > ttl]:
+            del self._sent[key]
+        return proposal_id in self._sent
 
     def _departure_alert(self, check: dict[str, Any], travel: dict[str, Any] | None) -> None:
         status = check.get("status")
@@ -181,15 +201,35 @@ class TempoNotificationBridge:
             proposal_id, approve = action.removeprefix(ACTION_REJECT_PREFIX), False
         else:
             return
-        if proposal_id:
-            self._hass.async_create_task(self._async_decide(proposal_id, approve), eager_start=True)
+        if not proposal_id or not self._was_sent(proposal_id):
+            LOGGER.warning("Ignoring a Tempo action for a proposal this entry did not send")
+            return
+        # Consumed now (synchronously) so a second tap cannot decide the proposal twice.
+        sent_at = self._sent.pop(proposal_id)
+        self._hass.async_create_task(
+            self._async_decide(proposal_id, approve, event.context.user_id, sent_at),
+            eager_start=True,
+        )
 
-    async def _async_decide(self, proposal_id: str, approve: bool) -> None:
+    async def _async_user_allowed(self, user_id: str | None) -> bool:
+        if user_id is None:
+            return True
+        user = await self._hass.auth.async_get_user(user_id)
+        return user is not None and user.is_active and not user.system_generated
+
+    async def _async_decide(
+        self, proposal_id: str, approve: bool, user_id: str | None, sent_at: float
+    ) -> None:
+        if not await self._async_user_allowed(user_id):
+            LOGGER.warning("Ignoring a Tempo action from a system or unknown user")
+            self._sent[proposal_id] = sent_at
+            return
         try:
             await self._coordinator.client.decide_proposal(proposal_id, approve)
         except TempoConflictError:
             LOGGER.info("Tempo proposal %s was already decided", proposal_id)
         except TempoError as err:
             LOGGER.warning("Could not decide Tempo proposal %s: %s", proposal_id, err)
+            self._sent[proposal_id] = sent_at  # allow a retry from the notification
             return
         await self._coordinator.async_request_refresh()

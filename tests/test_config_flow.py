@@ -13,6 +13,7 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClien
 
 from custom_components.tempo.const import (
     CONF_DASHBOARD,
+    CONF_DASHBOARD_REQUIRE_ADMIN,
     CONF_NOTIFY_SERVICE,
     CONF_TRACKER_ENTITY_ID,
     DOMAIN,
@@ -180,6 +181,7 @@ async def test_options_flow(
         CONF_SCAN_INTERVAL: 120,
         CONF_NOTIFY_SERVICE: "notify.mobile_app_phone",
         CONF_DASHBOARD: False,
+        CONF_DASHBOARD_REQUIRE_ADMIN: False,
     }
     assert calls(aioclient_mock, "PATCH", "/v1/settings")[-1][2] == {
         "tracker_entity_id": "device_tracker.other"

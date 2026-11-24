@@ -39,6 +39,23 @@ class TempoData:
     proposals: list[dict[str, Any]] = field(default_factory=list)
     notifications: list[dict[str, Any]] = field(default_factory=list)
     activities: list[dict[str, Any]] = field(default_factory=list)
+    settings: dict[str, Any] = field(default_factory=dict)
+    places: list[dict[str, Any]] = field(default_factory=list)
+
+
+def pending_proposals(data: TempoData | None) -> list[dict[str, Any]]:
+    """Return pending proposals, oldest first (ISO timestamps sort chronologically).
+
+    The sensor attributes, the buttons and the dashboard all use this single ordering.
+    """
+    if data is None:
+        return []
+    pending = [
+        p
+        for p in data.proposals
+        if p.get("status", "pending") == "pending" and p.get("id") is not None
+    ]
+    return sorted(pending, key=lambda p: str(p.get("created_at") or ""))
 
 
 @dataclass
@@ -56,7 +73,7 @@ type TempoConfigEntry = ConfigEntry[TempoRuntimeData]
 
 
 class TempoCoordinator(DataUpdateCoordinator[TempoData]):
-    """Poll summary, schedule, tasks, proposals, unread notifications and activities."""
+    """Poll summary, schedule, tasks, proposals, notifications, activities, settings, places."""
 
     config_entry: TempoConfigEntry
 
@@ -78,19 +95,18 @@ class TempoCoordinator(DataUpdateCoordinator[TempoData]):
         now = dt_util.now()
         try:
             (
-                summary,
-                schedule,
-                tasks,
-                proposals,
-                notifications,
-                activities,
+                (summary, schedule, tasks, proposals, notifications, activities),
+                (settings, places),
             ) = await asyncio.gather(
-                self.client.summary(),
-                self.client.schedule(now - SCHEDULE_PAST, now + SCHEDULE_FUTURE),
-                self.client.tasks(),
-                self.client.proposals(),
-                self.client.notifications(unread=True),
-                self.client.activities(),
+                asyncio.gather(
+                    self.client.summary(),
+                    self.client.schedule(now - SCHEDULE_PAST, now + SCHEDULE_FUTURE),
+                    self.client.tasks(),
+                    self.client.proposals(),
+                    self.client.notifications(unread=True),
+                    self.client.activities(),
+                ),
+                asyncio.gather(self.client.settings(), self.client.places()),
             )
         except TempoAuthError as err:
             raise ConfigEntryAuthFailed(
@@ -109,6 +125,8 @@ class TempoCoordinator(DataUpdateCoordinator[TempoData]):
             proposals=list(proposals or []),
             notifications=list(notifications or []),
             activities=list(activities or []),
+            settings=dict(settings or {}),
+            places=list(places or []),
         )
 
     async def async_fetch_schedule(self, start: datetime, end: datetime) -> list[dict[str, Any]]:

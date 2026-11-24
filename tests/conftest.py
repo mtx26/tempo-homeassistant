@@ -212,6 +212,28 @@ ACTIVITIES: list[dict[str, Any]] = [
 ]
 
 
+SETTINGS: dict[str, Any] = {
+    "home_place_id": "home",
+    "tracker_entity_id": TRACKER,
+    "horizon_days": 14,
+    "buffer_minutes": 10,
+    "stays": [
+        {
+            "place_id": "parents",
+            "start": "2026-12-20T10:00:00+01:00",
+            "end": "2026-12-27T18:00:00+01:00",
+        }
+    ],
+    "study_preferences": {"preferred_block_minutes": 90},
+}
+
+PLACES: list[dict[str, Any]] = [
+    {"id": "campus", "name": "Campus Plaine", "latitude": 50.82, "longitude": 4.4, "aliases": []},
+    {"id": "home", "name": "Kot", "latitude": 50.84, "longitude": 4.36, "aliases": ["kot"]},
+    {"id": "parents", "name": "Parents", "latitude": 50.5, "longitude": 4.0, "aliases": []},
+]
+
+
 def mock_backend(
     aioclient_mock: AiohttpClientMocker,
     *,
@@ -221,6 +243,8 @@ def mock_backend(
     proposals: list[dict[str, Any]] | None = None,
     notifications: list[dict[str, Any]] | None = None,
     activities: list[dict[str, Any]] | None = None,
+    settings: dict[str, Any] | None = None,
+    places: list[dict[str, Any]] | None = None,
 ) -> None:
     """Register the read endpoints plus generic write endpoints."""
     aioclient_mock.get(
@@ -242,6 +266,10 @@ def mock_backend(
         f"{BASE}/v1/activities",
         json=deepcopy(ACTIVITIES if activities is None else activities),
     )
+    aioclient_mock.get(
+        f"{BASE}/v1/settings", json=deepcopy(SETTINGS if settings is None else settings)
+    )
+    aioclient_mock.get(f"{BASE}/v1/places", json=deepcopy(PLACES if places is None else places))
     aioclient_mock.post(re.compile(r".*/v1/notifications/[^/]+/ack$"), status=204)
     aioclient_mock.patch(f"{BASE}/v1/settings", status=204)
     aioclient_mock.post(f"{BASE}/v1/location", status=204)

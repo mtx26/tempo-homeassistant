@@ -222,3 +222,97 @@ interpret:
       selector:
         text:
           multiline: true
+
+set_home:
+  fields:
+    config_entry_id: *entry
+    place_id:
+      required: true
+      example: "home"
+      selector:
+        text:
+
+set_settings:
+  fields:
+    config_entry_id: *entry
+    horizon_days:
+      required: false
+      example: 14
+      selector:
+        number:
+          min: 1
+          max: 42
+          unit_of_measurement: d
+          mode: box
+    buffer_minutes:
+      required: false
+      example: 10
+      selector:
+        number:
+          min: 0
+          max: 120
+          unit_of_measurement: min
+          mode: box
+    preferred_block_minutes: &block_minutes
+      required: false
+      selector:
+        number:
+          min: 15
+          max: 240
+          unit_of_measurement: min
+          mode: box
+    min_block_minutes: *block_minutes
+    max_block_minutes: *block_minutes
+    granularity_minutes:
+      required: false
+      selector:
+        select:
+          options:
+            - "5"
+            - "10"
+            - "15"
+            - "30"
+    min_gap_same_subject_minutes:
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 240
+          unit_of_measurement: min
+          mode: box
+    max_daily_study_minutes:
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 1440
+          unit_of_measurement: min
+          mode: box
+    max_blocks_per_subject_per_day:
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 4
+          mode: box
+
+add_stay:
+  fields:
+    config_entry_id: *entry
+    place_id:
+      required: true
+      example: "parents"
+      selector:
+        text:
+    start:
+      required: true
+      selector:
+        datetime:
+    end:
+      required: true
+      selector:
+        datetime:
+
+clear_stays:
+  fields:
+    config_entry_id: *entry

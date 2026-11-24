@@ -17,10 +17,11 @@ from homeassistant.core import (
 )
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.service import async_register_admin_service
 from homeassistant.util import dt as dt_util
 
 from .api import TempoApiError, TempoConflictError, TempoError, TempoNotFoundError
-from .const import CONF_DASHBOARD, DOMAIN
+from .const import CONF_DASHBOARD, CONF_DASHBOARD_REQUIRE_ADMIN, DOMAIN
 from .coordinator import TempoConfigEntry
 from .dashboard import (
     DASHBOARD_URL_PATH,
@@ -46,6 +47,24 @@ SERVICE_INTERPRET = "interpret"
 SERVICE_CONFIRM_ACTIVITY = "confirm_activity"
 SERVICE_INSTALL_DASHBOARD = "install_dashboard"
 SERVICE_REMOVE_DASHBOARD = "remove_dashboard"
+SERVICE_SET_HOME = "set_home"
+SERVICE_SET_SETTINGS = "set_settings"
+SERVICE_ADD_STAY = "add_stay"
+SERVICE_CLEAR_STAYS = "clear_stays"
+
+ADMIN_SERVICES = frozenset({SERVICE_INSTALL_DASHBOARD, SERVICE_REMOVE_DASHBOARD})
+
+# Study preferences accepted by the backend (tempo.scheduler.model.Preferences); the backend
+# still validates the combination (min <= preferred <= max, multiples of the granularity).
+STUDY_PREFERENCES: dict[str, Any] = {
+    "preferred_block_minutes": vol.All(vol.Coerce(int), vol.Range(min=15, max=240)),
+    "min_block_minutes": vol.All(vol.Coerce(int), vol.Range(min=15, max=240)),
+    "max_block_minutes": vol.All(vol.Coerce(int), vol.Range(min=15, max=240)),
+    "granularity_minutes": vol.All(vol.Coerce(int), vol.In([5, 10, 15, 30])),
+    "min_gap_same_subject_minutes": vol.All(vol.Coerce(int), vol.Range(min=0, max=240)),
+    "max_daily_study_minutes": vol.All(vol.Coerce(int), vol.Range(min=0, max=1440)),
+    "max_blocks_per_subject_per_day": vol.All(vol.Coerce(int), vol.Range(min=1, max=4)),
+}
 
 _ENTRY: dict[vol.Marker, Any] = {vol.Optional(ATTR_CONFIG_ENTRY_ID): cv.string}
 _ID = vol.All(cv.string, vol.Length(min=1, max=200))
@@ -118,16 +137,41 @@ CONFIRM_ACTIVITY_SCHEMA = vol.Schema(
         vol.Optional("start"): cv.datetime,
     }
 )
+SET_HOME_SCHEMA = vol.Schema({**_ENTRY, vol.Required("place_id"): _PLACE_ID})
+_SETTINGS_FIELDS: dict[vol.Marker, Any] = {
+    **_ENTRY,
+    vol.Optional("horizon_days"): vol.All(vol.Coerce(int), vol.Range(min=1, max=42)),
+    vol.Optional("buffer_minutes"): vol.All(vol.Coerce(int), vol.Range(min=0, max=120)),
+}
+for _key, _validator in STUDY_PREFERENCES.items():
+    _SETTINGS_FIELDS[vol.Optional(_key)] = _validator
+SET_SETTINGS_SCHEMA = vol.All(
+    vol.Schema(_SETTINGS_FIELDS),
+    cv.has_at_least_one_key("horizon_days", "buffer_minutes", *STUDY_PREFERENCES),
+)
+ADD_STAY_SCHEMA = vol.Schema(
+    {
+        **_ENTRY,
+        vol.Required("place_id"): _PLACE_ID,
+        vol.Required("start"): cv.datetime,
+        vol.Required("end"): cv.datetime,
+    }
+)
 INTERPRET_SCHEMA = vol.Schema(
     {**_ENTRY, vol.Required("text"): vol.All(cv.string, vol.Length(min=1, max=2000))}
 )
 
 
+def _aware(value: datetime) -> datetime:
+    """Return an aware datetime (naive values use the HA time zone)."""
+    if value.tzinfo is None:
+        return value.replace(tzinfo=dt_util.get_default_time_zone())
+    return value
+
+
 def _iso(value: datetime) -> str:
     """Serialize a datetime with an offset (naive values use the HA time zone)."""
-    if value.tzinfo is None:
-        value = value.replace(tzinfo=dt_util.get_default_time_zone())
-    return value.isoformat()
+    return _aware(value).isoformat()
 
 
 def _entry(hass: HomeAssistant, call: ServiceCall) -> TempoConfigEntry:
@@ -305,6 +349,61 @@ async def _set_availability(hass: HomeAssistant, call: ServiceCall) -> None:
     await _run(entry, entry.runtime_data.client.put_availability(windows))
 
 
+async def _require_place(entry: TempoConfigEntry, place_id: str) -> None:
+    """Refuse clearly a place that was not created with tempo.set_place."""
+    places = await _run(entry, entry.runtime_data.client.places(), refresh=False)
+    if not any(str(place.get("id")) == place_id for place in places or []):
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="unknown_place",
+            translation_placeholders={"place_id": place_id},
+        )
+
+
+async def _set_home(hass: HomeAssistant, call: ServiceCall) -> None:
+    entry = _entry(hass, call)
+    await _require_place(entry, call.data["place_id"])
+    payload = {"home_place_id": call.data["place_id"]}
+    await _run(entry, entry.runtime_data.client.patch_settings(payload))
+
+
+async def _current_settings(entry: TempoConfigEntry) -> dict[str, Any]:
+    """Read the settings from the backend (never from a possibly stale snapshot)."""
+    return dict(await _run(entry, entry.runtime_data.client.settings(), refresh=False) or {})
+
+
+async def _set_settings(hass: HomeAssistant, call: ServiceCall) -> None:
+    entry = _entry(hass, call)
+    payload: dict[str, Any] = {
+        key: call.data[key] for key in ("horizon_days", "buffer_minutes") if key in call.data
+    }
+    preferences = {key: call.data[key] for key in STUDY_PREFERENCES if key in call.data}
+    if preferences:
+        # PATCH replaces the whole study_preferences object: merge with the stored one.
+        current = (await _current_settings(entry)).get("study_preferences") or {}
+        payload["study_preferences"] = {**dict(current), **preferences}
+    await _run(entry, entry.runtime_data.client.patch_settings(payload))
+
+
+async def _add_stay(hass: HomeAssistant, call: ServiceCall) -> None:
+    """Declare a future stay; Tempo never switches home automatically."""
+    entry = _entry(hass, call)
+    start, end = _aware(call.data["start"]), _aware(call.data["end"])
+    if end <= start:
+        raise ServiceValidationError(translation_domain=DOMAIN, translation_key="invalid_window")
+    await _require_place(entry, call.data["place_id"])
+    stays = list((await _current_settings(entry)).get("stays") or [])
+    stays.append(
+        {"place_id": call.data["place_id"], "start": start.isoformat(), "end": end.isoformat()}
+    )
+    await _run(entry, entry.runtime_data.client.patch_settings({"stays": stays}))
+
+
+async def _clear_stays(hass: HomeAssistant, call: ServiceCall) -> None:
+    entry = _entry(hass, call)
+    await _run(entry, entry.runtime_data.client.patch_settings({"stays": []}))
+
+
 async def _acknowledge(hass: HomeAssistant, call: ServiceCall) -> None:
     entry = _entry(hass, call)
     await _run(entry, entry.runtime_data.client.ack_notification(call.data["notification_id"]))
@@ -337,7 +436,9 @@ async def _interpret(hass: HomeAssistant, call: ServiceCall) -> ServiceResponse:
 
 async def _install_dashboard(hass: HomeAssistant, call: ServiceCall) -> ServiceResponse:
     entry = _entry(hass, call)
-    async_register_dashboard(hass, entry.entry_id)
+    async_register_dashboard(
+        hass, entry.entry_id, require_admin=bool(entry.options.get(CONF_DASHBOARD_REQUIRE_ADMIN))
+    )
     hass.config_entries.async_update_entry(entry, options={**entry.options, CONF_DASHBOARD: True})
     return {"url_path": DASHBOARD_URL_PATH}
 
@@ -355,12 +456,17 @@ def async_setup_services(hass: HomeAssistant) -> None:
     def register(
         name: str,
         handler: Callable[[HomeAssistant, ServiceCall], Awaitable[Any]],
-        schema: vol.Schema,
+        schema: vol.Schema | vol.All,
         supports_response: SupportsResponse = SupportsResponse.NONE,
     ) -> None:
         async def _handle(call: ServiceCall) -> Any:
             return await handler(hass, call)
 
+        if name in ADMIN_SERVICES:
+            async_register_admin_service(
+                hass, DOMAIN, name, _handle, schema, supports_response=supports_response
+            )
+            return
         hass.services.async_register(
             DOMAIN, name, _handle, schema=schema, supports_response=supports_response
         )
@@ -385,4 +491,8 @@ def async_setup_services(hass: HomeAssistant) -> None:
         SupportsResponse.OPTIONAL,
     )
     register(SERVICE_REMOVE_DASHBOARD, _remove_dashboard, ENTRY_ONLY_SCHEMA)
+    register(SERVICE_SET_HOME, _set_home, SET_HOME_SCHEMA)
+    register(SERVICE_SET_SETTINGS, _set_settings, SET_SETTINGS_SCHEMA)
+    register(SERVICE_ADD_STAY, _add_stay, ADD_STAY_SCHEMA)
+    register(SERVICE_CLEAR_STAYS, _clear_stays, ENTRY_ONLY_SCHEMA)
     register(SERVICE_INTERPRET, _interpret, INTERPRET_SCHEMA, SupportsResponse.OPTIONAL)

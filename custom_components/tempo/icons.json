@@ -30,6 +30,9 @@
       },
       "trainings_to_confirm": {
         "default": "mdi:run-fast"
+      },
+      "settings": {
+        "default": "mdi:cog"
       }
     },
     "todo": {
@@ -102,6 +105,18 @@
     },
     "remove_dashboard": {
       "service": "mdi:view-dashboard-outline"
+    },
+    "set_home": {
+      "service": "mdi:home-edit"
+    },
+    "set_settings": {
+      "service": "mdi:tune"
+    },
+    "add_stay": {
+      "service": "mdi:home-plus"
+    },
+    "clear_stays": {
+      "service": "mdi:home-remove"
     }
   }
 }

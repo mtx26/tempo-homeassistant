@@ -19,9 +19,19 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
 
 from .api import TempoApiClient, TempoAuthError, TempoError
-from .const import CONF_DASHBOARD, CONF_TRACKER_ENTITY_ID, DOMAIN, LOGGER
+from .const import (
+    CONF_DASHBOARD,
+    CONF_DASHBOARD_REQUIRE_ADMIN,
+    CONF_TRACKER_ENTITY_ID,
+    DOMAIN,
+    LOGGER,
+)
 from .coordinator import TempoConfigEntry, TempoCoordinator, TempoRuntimeData
-from .dashboard import async_register_dashboard, async_unregister_dashboard
+from .dashboard import (
+    async_register_dashboard,
+    async_track_proposals,
+    async_unregister_dashboard,
+)
 from .location import TempoLocationPusher
 from .notify_bridge import TempoNotificationBridge
 from .services import async_setup_services
@@ -82,9 +92,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: TempoConfigEntry) -> boo
 
     if entry.options.get(CONF_DASHBOARD):
         try:
-            async_register_dashboard(hass, entry.entry_id)
+            async_register_dashboard(
+                hass,
+                entry.entry_id,
+                require_admin=bool(entry.options.get(CONF_DASHBOARD_REQUIRE_ADMIN)),
+            )
         except HomeAssistantError as err:
             LOGGER.warning("Tempo dashboard not registered: %s", err)
+    entry.async_on_unload(async_track_proposals(hass, entry))
     entry.async_on_unload(lambda: async_unregister_dashboard(hass, entry.entry_id))
     return True
 

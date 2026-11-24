@@ -2,7 +2,8 @@
 
 The backend interprets the request (optionally with an LLM) and deterministic code validates
 and applies it; questions are answered with ``action == "answer"``. This agent never invents
-an answer: it speaks the backend ``summary`` or a clear error.
+an answer: it speaks the backend ``summary`` or a generic error message; raw backend error
+details and internal URLs are only logged.
 """
 
 from __future__ import annotations
@@ -26,13 +27,13 @@ MESSAGES: dict[str, dict[str, str]] = {
         "not_understood": "Sorry, Tempo did not understand this request.",
         "unavailable": "This Tempo backend does not support natural-language requests.",
         "auth": "The Tempo token was rejected; re-authenticate the integration.",
-        "error": "Tempo could not be reached: {error}",
+        "error": "Tempo could not answer right now. Please try again later.",
     },
     "fr": {
         "not_understood": "Désolé, Tempo n'a pas compris cette demande.",
         "unavailable": "Ce backend Tempo ne prend pas en charge les demandes en langage naturel.",
         "auth": "Le jeton Tempo a été refusé ; ré-authentifiez l'intégration.",
-        "error": "Impossible de joindre Tempo : {error}",
+        "error": "Tempo ne peut pas répondre pour le moment. Réessayez plus tard.",
     },
 }
 
@@ -82,10 +83,12 @@ class TempoConversationEntity(TempoEntity, conversation.ConversationEntity):
         except TempoNotFoundError:
             return self._error(user_input, chat_log, texts["unavailable"])
         except TempoAuthError:
+            LOGGER.warning("Tempo rejected the token during a conversation request")
             return self._error(user_input, chat_log, texts["auth"])
         except TempoError as err:
+            # Details (status, backend message, URLs) go to the log only, never to speech.
             LOGGER.warning("Tempo interpret request failed: %s", err)
-            return self._error(user_input, chat_log, texts["error"].format(error=err))
+            return self._error(user_input, chat_log, texts["error"])
 
         summary = str(result.get("summary") or "").strip()
         if not result.get("understood") and not summary:

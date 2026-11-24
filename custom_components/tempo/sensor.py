@@ -13,12 +13,12 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import UnitOfTime
+from homeassistant.const import EntityCategory, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import DEPARTURE_STATUSES, PLAN_STATUSES
-from .coordinator import TempoConfigEntry, TempoCoordinator, TempoData
+from .coordinator import TempoConfigEntry, TempoCoordinator, TempoData, pending_proposals
 from .entity import TempoEntity, parse_dt
 
 PARALLEL_UPDATES = 0
@@ -135,12 +135,49 @@ def _int(key: str) -> Callable[[TempoData], int | None]:
 
 
 def _proposal_attrs(data: TempoData) -> dict[str, Any]:
+    """Pending proposals, oldest first (same order as the proposal buttons)."""
     return {
         "proposals": [
-            {"id": p.get("id"), "kind": p.get("kind"), "title": p.get("title")}
-            for p in data.proposals
-            if p.get("status", "pending") == "pending"
+            {
+                "id": p.get("id"),
+                "kind": p.get("kind"),
+                "title": p.get("title"),
+                "created_at": p.get("created_at"),
+            }
+            for p in pending_proposals(data)
         ]
+    }
+
+
+def _place_name(data: TempoData, place_id: Any) -> str | None:
+    for place in data.places:
+        if place_id is not None and place.get("id") == place_id:
+            return str(place.get("name") or place_id)
+    return None
+
+
+def _home_value(data: TempoData) -> str | None:
+    home = (data.settings or {}).get("home_place_id")
+    if not home:
+        return None
+    return (_place_name(data, home) or str(home))[:255]
+
+
+def _settings_attrs(data: TempoData) -> dict[str, Any]:
+    settings = data.settings or {}
+    home = settings.get("home_place_id")
+    return {
+        "home_place_id": home,
+        "home_place_name": _place_name(data, home),
+        "horizon_days": settings.get("horizon_days"),
+        "buffer_minutes": settings.get("buffer_minutes"),
+        "stays": [
+            {**stay, "place_name": _place_name(data, stay.get("place_id"))}
+            for stay in settings.get("stays") or []
+            if isinstance(stay, dict)
+        ],
+        "study_preferences": dict(settings.get("study_preferences") or {}),
+        "places": [{"id": place.get("id"), "name": place.get("name")} for place in data.places],
     }
 
 
@@ -242,6 +279,13 @@ SENSORS: tuple[TempoSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda data: len(_summary(data).get("issues") or []),
         attrs_fn=_issues_attrs,
+    ),
+    TempoSensorEntityDescription(
+        key="settings",
+        translation_key="settings",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=_home_value,
+        attrs_fn=_settings_attrs,
     ),
 )
 

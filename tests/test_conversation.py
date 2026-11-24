@@ -91,8 +91,8 @@ async def test_not_understood(
     [
         (404, "fr", "Ce backend Tempo ne prend pas en charge"),
         (401, "en", "The Tempo token was rejected"),
-        (500, "en", "Tempo could not be reached"),
-        (503, "fr", "Impossible de joindre Tempo"),
+        (500, "en", "Tempo could not answer right now"),
+        (503, "fr", "Tempo ne peut pas répondre pour le moment"),
     ],
 )
 async def test_backend_errors(
@@ -108,3 +108,22 @@ async def test_backend_errors(
     response = await _converse(hass, "x", language=language)
     assert response.response_type is intent.IntentResponseType.ERROR
     assert response.speech["plain"]["speech"].startswith(expected)
+
+
+async def test_error_details_not_spoken(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    init_integration: MockConfigEntry,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Backend error details and internal URLs are logged, never spoken."""
+    aioclient_mock.post(
+        f"{BASE}/v1/interpret", status=422, json={"detail": f"boom at {BASE}/internal"}
+    )
+    response = await _converse(hass, "x", language="en")
+    speech = response.speech["plain"]["speech"]
+    assert response.response_type is intent.IntentResponseType.ERROR
+    assert "tempo-api" not in speech
+    assert "422" not in speech
+    assert "boom" not in speech
+    assert "boom" in caplog.text

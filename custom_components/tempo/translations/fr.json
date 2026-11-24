@@ -53,13 +53,18 @@
           "tracker_entity_id": "Traceur du téléphone",
           "scan_interval": "Intervalle d'interrogation",
           "notify_service": "Service de notification (facultatif)",
-          "dashboard": "Afficher le tableau de bord Tempo dans la barre latérale"
+          "dashboard": "Afficher le tableau de bord Tempo dans la barre latérale",
+          "home_place_id": "Domicile",
+          "dashboard_require_admin": "Tableau de bord réservé aux administrateurs"
         },
         "data_description": {
           "scan_interval": "Secondes entre deux interrogations du backend (minimum 30).",
           "notify_service": "Par exemple notify.mobile_app_telephone, utilisé pour les approbations et les alertes de départ.",
-          "dashboard": "Ajoute un tableau de bord « Tempo » en lecture seule généré par l'intégration (agenda, départ, tâches, approbations, état)."
-        }
+          "dashboard": "Ajoute un tableau de bord « Tempo » en lecture seule généré par l'intégration (agenda, départ, tâches, approbations, état).",
+          "home_place_id": "Enregistré dans Tempo ; il ne change jamais automatiquement. Déclarez les séjours temporaires avec tempo.add_stay.",
+          "dashboard_require_admin": "Désactivé par défaut : tout utilisateur de Home Assistant peut ouvrir le tableau de bord Tempo."
+        },
+        "description": "La liste des domiciles propose les lieux créés avec l'action tempo.set_place."
       }
     },
     "error": {
@@ -67,7 +72,8 @@
       "invalid_auth": "Jeton invalide.",
       "rate_limited": "Trop de tentatives échouées. Patientez un moment puis réessayez.",
       "invalid_notify_service": "Service de notification inconnu (format attendu : notify.xxx).",
-      "unknown": "Erreur inattendue."
+      "unknown": "Erreur inattendue.",
+      "unknown_place": "Lieu inconnu."
     }
   },
   "entity": {
@@ -119,6 +125,9 @@
       },
       "trainings_to_confirm": {
         "name": "Entraînements à confirmer"
+      },
+      "settings": {
+        "name": "Réglages"
       }
     },
     "todo": {
@@ -203,6 +212,15 @@
     },
     "dashboard_url_taken": {
       "message": "Un autre tableau de bord utilise déjà l'URL /{url}."
+    },
+    "proposal_changed": {
+      "message": "La plus ancienne proposition en attente n'est plus « {title} » (déjà décidée ou liste modifiée). Vérifiez la liste et réessayez."
+    },
+    "unknown_place": {
+      "message": "Lieu Tempo {place_id} inconnu ; créez-le d'abord avec tempo.set_place."
+    },
+    "proposal_just_changed": {
+      "message": "La proposition affichée vient de changer : « {title} ». Vérifiez-la puis appuyez à nouveau."
     }
   },
   "services": {
@@ -476,7 +494,7 @@
     },
     "install_dashboard": {
       "name": "Installer le tableau de bord",
-      "description": "Ajoute le tableau de bord Tempo (lecture seule) à la barre latérale (conservé après redémarrage).",
+      "description": "Ajoute le tableau de bord Tempo (lecture seule) à la barre latérale (conservé après redémarrage). Réservé aux administrateurs.",
       "fields": {
         "config_entry_id": {
           "name": "Entrée de configuration",
@@ -486,7 +504,99 @@
     },
     "remove_dashboard": {
       "name": "Retirer le tableau de bord",
-      "description": "Retire le tableau de bord Tempo de la barre latérale.",
+      "description": "Retire le tableau de bord Tempo de la barre latérale. Réservé aux administrateurs.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Entrée de configuration",
+          "description": "Entrée Tempo à utiliser (facultatif s'il n'y en a qu'une)."
+        }
+      }
+    },
+    "set_home": {
+      "name": "Définir le domicile",
+      "description": "Choisit le domicile parmi les lieux définis avec Définir un lieu. Le domicile ne change jamais automatiquement.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Entrée de configuration",
+          "description": "Entrée Tempo à utiliser (facultatif s'il n'y en a qu'une)."
+        },
+        "place_id": {
+          "name": "ID du lieu",
+          "description": "Identifiant d'un lieu Tempo existant."
+        }
+      }
+    },
+    "set_settings": {
+      "name": "Régler la planification",
+      "description": "Modifie l'horizon de planification, la marge de trajet et/ou les préférences d'étude (seuls les champs fournis changent).",
+      "fields": {
+        "config_entry_id": {
+          "name": "Entrée de configuration",
+          "description": "Entrée Tempo à utiliser (facultatif s'il n'y en a qu'une)."
+        },
+        "horizon_days": {
+          "name": "Horizon",
+          "description": "Nombre de jours planifiés à l'avance (1-42)."
+        },
+        "buffer_minutes": {
+          "name": "Marge",
+          "description": "Marge de sécurité ajoutée aux trajets, en minutes (0-120)."
+        },
+        "preferred_block_minutes": {
+          "name": "Durée de bloc préférée",
+          "description": "Durée préférée d'un bloc d'étude en minutes (préférence souple, 90 par défaut)."
+        },
+        "min_block_minutes": {
+          "name": "Durée minimale de bloc",
+          "description": "Bloc d'étude le plus court, en minutes (15-240)."
+        },
+        "max_block_minutes": {
+          "name": "Durée maximale de bloc",
+          "description": "Bloc d'étude le plus long, en minutes (15-240)."
+        },
+        "granularity_minutes": {
+          "name": "Granularité",
+          "description": "Pas de temps des blocs : 5, 10, 15 ou 30 minutes."
+        },
+        "min_gap_same_subject_minutes": {
+          "name": "Écart entre blocs d'une même matière",
+          "description": "Minutes minimales entre deux blocs de la même matière (0-240)."
+        },
+        "max_daily_study_minutes": {
+          "name": "Étude maximale par jour",
+          "description": "Minutes d'étude maximales par jour (0-1440)."
+        },
+        "max_blocks_per_subject_per_day": {
+          "name": "Blocs par matière et par jour",
+          "description": "Nombre maximal de blocs d'une matière par jour (1-4)."
+        }
+      }
+    },
+    "add_stay": {
+      "name": "Ajouter un séjour",
+      "description": "Déclare un séjour futur dans un autre lieu (par exemple un week-end en famille). Tempo ne change jamais de domicile automatiquement.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Entrée de configuration",
+          "description": "Entrée Tempo à utiliser (facultatif s'il n'y en a qu'une)."
+        },
+        "place_id": {
+          "name": "ID du lieu",
+          "description": "Identifiant d'un lieu Tempo existant."
+        },
+        "start": {
+          "name": "Début",
+          "description": "Début du séjour."
+        },
+        "end": {
+          "name": "Fin",
+          "description": "Fin du séjour."
+        }
+      }
+    },
+    "clear_stays": {
+      "name": "Effacer les séjours",
+      "description": "Supprime tous les séjours déclarés.",
       "fields": {
         "config_entry_id": {
           "name": "Entrée de configuration",
