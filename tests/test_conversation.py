@@ -38,7 +38,7 @@ async def test_answer_question(
         f"{BASE}/v1/conversation",
         json={"reply": "Prochain départ à 09:10 depuis Home.", "used_llm": True, "changed": False},
     )
-    before = len(calls(aioclient_mock, "GET", "/v1/summary"))
+    before = len(calls(aioclient_mock, "POST", "/v1/operations/get_summary"))
     response = await _converse(hass, "prochain départ ?")
     assert response.response_type is intent.IntentResponseType.ACTION_DONE
     assert response.speech["plain"]["speech"] == "Prochain départ à 09:10 depuis Home."
@@ -46,7 +46,7 @@ async def test_answer_question(
     assert sent["text"] == "prochain départ ?"
     assert sent["conversation_id"]  # follow-ups keep their context
     await hass.async_block_till_done()
-    assert len(calls(aioclient_mock, "GET", "/v1/summary")) == before
+    assert len(calls(aioclient_mock, "POST", "/v1/operations/get_summary")) == before
 
 
 async def test_applied_refreshes(
@@ -57,11 +57,11 @@ async def test_applied_refreshes(
         f"{BASE}/v1/conversation",
         json={"reply": "Task added.", "used_llm": True, "changed": True},
     )
-    before = len(calls(aioclient_mock, "GET", "/v1/summary"))
+    before = len(calls(aioclient_mock, "POST", "/v1/operations/get_summary"))
     response = await _converse(hass, "add 2 h of maths before Friday", language="en")
     assert response.speech["plain"]["speech"] == "Task added."
     await hass.async_block_till_done()
-    assert len(calls(aioclient_mock, "GET", "/v1/summary")) > before
+    assert len(calls(aioclient_mock, "POST", "/v1/operations/get_summary")) > before
 
 
 async def test_not_understood(

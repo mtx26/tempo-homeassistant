@@ -116,7 +116,7 @@ async def test_trainings_to_confirm_empty(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, mock_config_entry: MockConfigEntry
 ) -> None:
     """No activity to confirm gives 0 and an empty list."""
-    mock_backend(aioclient_mock, activities=[])
+    mock_backend(aioclient_mock, summary={**SUMMARY, "to_confirm": []})
     await setup_entry(hass, mock_config_entry)
     state = hass.states.get("sensor.tempo_trainings_to_confirm")
     assert state is not None

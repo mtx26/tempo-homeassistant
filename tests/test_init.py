@@ -19,15 +19,15 @@ async def test_setup_and_unload(
 ) -> None:
     """The entry loads, polls every endpoint with the token and unloads cleanly."""
     assert init_integration.state is ConfigEntryState.LOADED
-    for path in ("/v1/summary", "/v1/schedule", "/v1/tasks", "/v1/proposals"):
-        found = calls(aioclient_mock, "GET", path)
-        assert found, path
+    for name in ("get_summary", "get_schedule", "list_tasks", "list_proposals", "get_context"):
+        found = calls(aioclient_mock, "POST", f"/v1/operations/{name}")
+        assert found, name
         assert found[0][3]["Authorization"] == f"Bearer {TOKEN}"
-    notif = calls(aioclient_mock, "GET", "/v1/notifications")
-    assert notif[0][1].query["unread"] == "true"
-    schedule = calls(aioclient_mock, "GET", "/v1/schedule")[0][1]
-    assert schedule.query["start"].startswith("2026-11-22T08:00:00")
-    assert schedule.query["end"].startswith("2026-12-07T08:00:00")
+    notif = calls(aioclient_mock, "POST", "/v1/operations/list_notifications")
+    assert notif[0][2]["unread_only"] is True
+    schedule = calls(aioclient_mock, "POST", "/v1/operations/get_schedule")[0][2]
+    assert schedule["start"].startswith("2026-11-22T08:00:00")
+    assert schedule["end"].startswith("2026-12-07T08:00:00")
 
     # async_entries_for_config_entry exists on every supported HA version (async_get_device
     # is deprecated since 2026.10).
@@ -78,7 +78,7 @@ async def test_coordinator_auth_failure_triggers_reauth(
 ) -> None:
     """A 401 during polling starts reauth."""
     aioclient_mock.clear_requests()
-    aioclient_mock.get(f"{BASE}/v1/summary", status=401)
+    aioclient_mock.post(f"{BASE}/v1/operations/get_summary", status=401)
     mock_backend(aioclient_mock)
     await poll(hass)
     flows = hass.config_entries.flow.async_progress()
@@ -93,7 +93,7 @@ async def test_coordinator_update_failed(
     """A server error makes entities unavailable until the backend recovers."""
     assert hass.states.get("sensor.tempo_plan_status").state == "partial"
     aioclient_mock.clear_requests()
-    aioclient_mock.get(f"{BASE}/v1/summary", status=500)
+    aioclient_mock.post(f"{BASE}/v1/operations/get_summary", status=500)
     mock_backend(aioclient_mock)
     await poll(hass)
     assert hass.states.get("sensor.tempo_plan_status").state == STATE_UNAVAILABLE

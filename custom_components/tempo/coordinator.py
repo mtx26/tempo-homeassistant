@@ -38,8 +38,8 @@ class TempoData:
     tasks: list[dict[str, Any]] = field(default_factory=list)
     proposals: list[dict[str, Any]] = field(default_factory=list)
     notifications: list[dict[str, Any]] = field(default_factory=list)
-    activities: list[dict[str, Any]] = field(default_factory=list)
     settings: dict[str, Any] = field(default_factory=dict)
+    """Operation get_context: home place, tracker, horizon, margins, planned locations."""
     places: list[dict[str, Any]] = field(default_factory=list)
 
 
@@ -73,7 +73,7 @@ type TempoConfigEntry = ConfigEntry[TempoRuntimeData]
 
 
 class TempoCoordinator(DataUpdateCoordinator[TempoData]):
-    """Poll summary, schedule, tasks, proposals, notifications, activities, settings, places."""
+    """Poll summary, schedule, tasks, proposals, notifications, context and places."""
 
     config_entry: TempoConfigEntry
 
@@ -95,7 +95,7 @@ class TempoCoordinator(DataUpdateCoordinator[TempoData]):
         now = dt_util.now()
         try:
             (
-                (summary, schedule, tasks, proposals, notifications, activities),
+                (summary, schedule, tasks, proposals, notifications),
                 (settings, places),
             ) = await asyncio.gather(
                 asyncio.gather(
@@ -103,10 +103,9 @@ class TempoCoordinator(DataUpdateCoordinator[TempoData]):
                     self.client.schedule(now - SCHEDULE_PAST, now + SCHEDULE_FUTURE),
                     self.client.tasks(),
                     self.client.proposals(),
-                    self.client.notifications(unread=True),
-                    self.client.activities(),
+                    self.client.notifications(),
                 ),
-                asyncio.gather(self.client.settings(), self.client.places()),
+                asyncio.gather(self.client.context(), self.client.places()),
             )
         except TempoAuthError as err:
             raise ConfigEntryAuthFailed(
@@ -124,7 +123,6 @@ class TempoCoordinator(DataUpdateCoordinator[TempoData]):
             tasks=list(tasks or []),
             proposals=list(proposals or []),
             notifications=list(notifications or []),
-            activities=list(activities or []),
             settings=dict(settings or {}),
             places=list(places or []),
         )

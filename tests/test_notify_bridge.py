@@ -26,13 +26,15 @@ async def test_persistent_notification_once_and_ack(
     notifications = persistent_notification._async_get_or_create_notifications(hass)
     assert "tempo_notif-1" in notifications
     assert notifications["tempo_notif-1"]["title"] == "Cours modifié"
-    assert len(calls(aioclient_mock, "POST", "/v1/notifications/notif-1/ack")) == 1
+    acks = calls(aioclient_mock, "POST", "/v1/operations/acknowledge_notification")
+    assert [a[2] for a in acks] == [{"id": "notif-1"}]
 
     # User dismisses it; the backend still lists it (ack lost): not shown again, ack retried.
     persistent_notification.async_dismiss(hass, "tempo_notif-1")
     await poll(hass)
     assert "tempo_notif-1" not in notifications
-    assert len(calls(aioclient_mock, "POST", "/v1/notifications/notif-1/ack")) == 2
+    acks = calls(aioclient_mock, "POST", "/v1/operations/acknowledge_notification")
+    assert len(acks) == 2
 
 
 async def test_departure_alert_once_per_status(

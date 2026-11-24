@@ -24,6 +24,5 @@ async def test_diagnostics_redacts_token(
         "tasks": 3,
         "proposals": 1,
         "unread_notifications": 1,
-        "activities": 4,
     }
     assert TOKEN not in json.dumps(diag, default=str)

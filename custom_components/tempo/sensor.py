@@ -173,7 +173,7 @@ def _settings_attrs(data: TempoData) -> dict[str, Any]:
         "buffer_minutes": settings.get("buffer_minutes"),
         "stays": [
             {**stay, "place_name": _place_name(data, stay.get("place_id"))}
-            for stay in settings.get("stays") or []
+            for stay in settings.get("planned_locations") or []
             if isinstance(stay, dict)
         ],
         "study_preferences": dict(settings.get("study_preferences") or {}),
@@ -182,7 +182,7 @@ def _settings_attrs(data: TempoData) -> dict[str, Any]:
 
 
 def _to_confirm(data: TempoData) -> list[dict[str, Any]]:
-    return [a for a in data.activities if a.get("status") == "to_confirm"]
+    return list(_summary(data).get("to_confirm") or [])
 
 
 def _to_confirm_attrs(data: TempoData) -> dict[str, Any]:

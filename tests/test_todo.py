@@ -55,7 +55,7 @@ async def test_list_is_read_only(
 
 
 def test_unknown_duration_and_no_deadline() -> None:
-    assert "Durée inconnue" in task_description({"effort_minutes": None})
+    assert "Durée inconnue" in task_description({"estimated_minutes": None})
     assert "sans échéance" in task_description(
-        {"effort_minutes": 60, "remaining_minutes": 60, "completed_minutes": 0}
+        {"estimated_minutes": 60, "remaining_minutes": 60, "done_minutes": 0}
     )

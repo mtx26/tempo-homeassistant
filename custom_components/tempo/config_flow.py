@@ -84,7 +84,7 @@ async def _push_tracker(client: TempoApiClient, entity_id: str) -> dict[str, str
 
 async def _patch_settings(client: TempoApiClient, payload: dict[str, Any]) -> dict[str, str]:
     try:
-        await client.patch_settings(payload)
+        await client.update_settings(payload)
     except TempoAuthError:
         return {"base": "invalid_auth"}
     except TempoRateLimitedError:
@@ -227,7 +227,7 @@ class TempoOptionsFlow(OptionsFlowWithReload):
                     "longitude": config.longitude,
                 },
             )
-            await client.operation("update_settings", {"home_place_id": "home"})
+            await client.update_settings({"home_place_id": "home"})
         except TempoAuthError:
             return {"base": "invalid_auth"}
         except TempoError as err:

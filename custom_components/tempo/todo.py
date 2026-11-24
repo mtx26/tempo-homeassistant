@@ -32,19 +32,19 @@ async def async_setup_entry(
 
 def task_description(task: dict[str, Any]) -> str:
     """Describe the remaining work and the kind of target of a task."""
-    effort = task.get("effort_minutes")
+    effort = task.get("estimated_minutes")
     if effort is None:
         return "Durée inconnue : précisez-la à Tempo pour qu'elle soit planifiée"
     kind = (
         "échéance stricte"
-        if task.get("target_kind") == "hard"
+        if task.get("hard_deadline")
         else "date cible souple"
         if task.get("target_date")
         else "sans échéance"
     )
     return (
         f"Reste {task.get('remaining_minutes', 0)} min sur {effort} min "
-        f"({task.get('completed_minutes', 0)} min faites) — {kind}"
+        f"({task.get('done_minutes', 0)} min faites) — {kind}"
     )
 
 
@@ -59,7 +59,7 @@ def task_to_item(task: dict[str, Any]) -> TodoItem:
     remaining = task.get("remaining_minutes")
     done = remaining is not None and int(remaining) <= 0
     return TodoItem(
-        summary=str(task.get("subject") or ""),
+        summary=str(task.get("title") or ""),
         uid=str(task["id"]),
         status=TodoItemStatus.COMPLETED if done else TodoItemStatus.NEEDS_ACTION,
         due=due,

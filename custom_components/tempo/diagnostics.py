@@ -33,7 +33,6 @@ async def async_get_config_entry_diagnostics(
             "tasks": len(data.tasks),
             "proposals": len(data.proposals),
             "unread_notifications": len(data.notifications),
-            "activities": len(data.activities),
         },
         "data": async_redact_data(asdict(data), TO_REDACT),
     }

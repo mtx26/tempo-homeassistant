@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Generator
 from copy import deepcopy
 from datetime import UTC, datetime, timedelta
@@ -87,6 +86,20 @@ SUMMARY: dict[str, Any] = {
     "today_study_minutes": 90,
     "pending_proposals": 1,
     "unread_notifications": 1,
+    "to_confirm": [
+        {
+            "id": "act-2",
+            "kind": "training",
+            "title": "Fractionné 10x400",
+            "preferred_day": "2026-11-25",
+        },
+        {
+            "id": "act-3",
+            "kind": "race",
+            "title": "Cross de Bruxelles",
+            "preferred_day": "2026-11-29",
+        },
+    ],
 }
 
 SCHEDULE: list[dict[str, Any]] = [
@@ -120,32 +133,32 @@ SCHEDULE: list[dict[str, Any]] = [
 TASKS: list[dict[str, Any]] = [
     {
         "id": "task-1",
-        "subject": "Analyse",
-        "effort_minutes": 600,
-        "completed_minutes": 90,
+        "title": "Analyse",
+        "estimated_minutes": 600,
+        "done_minutes": 90,
         "remaining_minutes": 510,
         "target_date": "2026-12-05",
-        "target_kind": "soft",
+        "hard_deadline": False,
         "archived": False,
     },
     {
         "id": "task-2",
-        "subject": "Physique",
-        "effort_minutes": 120,
-        "completed_minutes": 0,
+        "title": "Physique",
+        "estimated_minutes": 120,
+        "done_minutes": 0,
         "remaining_minutes": 120,
         "target_date": "2026-12-10",
-        "target_kind": "hard",
+        "hard_deadline": True,
         "archived": False,
     },
     {
         "id": "task-3",
-        "subject": "Archivée",
-        "effort_minutes": 60,
-        "completed_minutes": 60,
+        "title": "Archivée",
+        "estimated_minutes": 60,
+        "done_minutes": 60,
         "remaining_minutes": 0,
         "target_date": "2026-11-01",
-        "target_kind": "soft",
+        "hard_deadline": False,
         "archived": True,
     },
 ]
@@ -172,52 +185,12 @@ NOTIFICATIONS: list[dict[str, Any]] = [
     }
 ]
 
-ACTIVITIES: list[dict[str, Any]] = [
-    {
-        "id": "act-1",
-        "kind": "training",
-        "title": "Footing",
-        "status": "active",
-        "preferred_day": None,
-        "user_modified": False,
-        "duration_minutes": 60,
-    },
-    {
-        "id": "act-2",
-        "kind": "training",
-        "title": "Fractionné 10x400",
-        "status": "to_confirm",
-        "preferred_day": "2026-11-25",
-        "user_modified": False,
-        "duration_minutes": None,
-    },
-    {
-        "id": "act-3",
-        "kind": "race",
-        "title": "Cross de Bruxelles",
-        "status": "to_confirm",
-        "preferred_day": "2026-11-29",
-        "user_modified": False,
-        "duration_minutes": None,
-    },
-    {
-        "id": "act-4",
-        "kind": "training",
-        "title": "Annulé",
-        "status": "cancelled",
-        "preferred_day": None,
-        "user_modified": True,
-        "duration_minutes": 45,
-    },
-]
-
-
 SETTINGS: dict[str, Any] = {
     "home_place_id": "home",
     "tracker_entity_id": TRACKER,
     "horizon_days": 14,
     "buffer_minutes": 10,
-    "stays": [
+    "planned_locations": [
         {
             "place_id": "parents",
             "start": "2026-12-20T10:00:00+01:00",
@@ -234,6 +207,16 @@ PLACES: list[dict[str, Any]] = [
 ]
 
 
+def op(name: str) -> str:
+    """URL of an operation of the backend catalogue."""
+    return f"{BASE}/v1/operations/{name}"
+
+
+def mock_result(aioclient_mock: AiohttpClientMocker, name: str, result: Any) -> None:
+    """Register a successful operation."""
+    aioclient_mock.post(op(name), json={"ok": True, "result": deepcopy(result)})
+
+
 def mock_backend(
     aioclient_mock: AiohttpClientMocker,
     *,
@@ -242,36 +225,32 @@ def mock_backend(
     tasks: list[dict[str, Any]] | None = None,
     proposals: list[dict[str, Any]] | None = None,
     notifications: list[dict[str, Any]] | None = None,
-    activities: list[dict[str, Any]] | None = None,
     settings: dict[str, Any] | None = None,
     places: list[dict[str, Any]] | None = None,
 ) -> None:
-    """Register the read endpoints plus generic write endpoints."""
+    """Register the read operations plus the technical writes."""
     aioclient_mock.get(
         f"{BASE}/v1/status", json={"version": "0.6.0", "timezone": "Europe/Brussels"}
     )
-    aioclient_mock.get(f"{BASE}/v1/summary", json=deepcopy(summary or SUMMARY))
-    aioclient_mock.get(
-        f"{BASE}/v1/schedule", json=deepcopy(SCHEDULE if schedule is None else schedule)
+    mock_result(aioclient_mock, "get_summary", summary or SUMMARY)
+    mock_result(
+        aioclient_mock, "get_schedule", {"items": SCHEDULE if schedule is None else schedule}
     )
-    aioclient_mock.get(f"{BASE}/v1/tasks", json=deepcopy(TASKS if tasks is None else tasks))
-    aioclient_mock.get(
-        f"{BASE}/v1/proposals", json=deepcopy(PROPOSALS if proposals is None else proposals)
+    mock_result(aioclient_mock, "list_tasks", {"tasks": TASKS if tasks is None else tasks})
+    mock_result(
+        aioclient_mock,
+        "list_proposals",
+        {"proposals": PROPOSALS if proposals is None else proposals},
     )
-    aioclient_mock.get(
-        f"{BASE}/v1/notifications",
-        json=deepcopy(NOTIFICATIONS if notifications is None else notifications),
+    mock_result(
+        aioclient_mock,
+        "list_notifications",
+        {"notifications": NOTIFICATIONS if notifications is None else notifications},
     )
-    aioclient_mock.get(
-        f"{BASE}/v1/activities",
-        json=deepcopy(ACTIVITIES if activities is None else activities),
-    )
-    aioclient_mock.get(
-        f"{BASE}/v1/settings", json=deepcopy(SETTINGS if settings is None else settings)
-    )
-    aioclient_mock.get(f"{BASE}/v1/places", json=deepcopy(PLACES if places is None else places))
-    aioclient_mock.post(re.compile(r".*/v1/notifications/[^/]+/ack$"), status=204)
-    aioclient_mock.patch(f"{BASE}/v1/settings", status=204)
+    mock_result(aioclient_mock, "get_context", SETTINGS if settings is None else settings)
+    mock_result(aioclient_mock, "list_places", {"places": PLACES if places is None else places})
+    mock_result(aioclient_mock, "acknowledge_notification", {"acknowledged": "x"})
+    mock_result(aioclient_mock, "update_settings", {"updated": []})
     aioclient_mock.post(f"{BASE}/v1/location", status=204)
 
 

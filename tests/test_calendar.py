@@ -64,9 +64,9 @@ async def test_get_events_mapping(
     assert "État : planifié" in events[2]["description"]
     assert "Notes : Zone 2" in events[3]["description"]
     assert "Déplaçable" in events[3]["description"]
-    fetched = calls(aioclient_mock, "GET", "/v1/schedule")
+    fetched = calls(aioclient_mock, "POST", "/v1/operations/get_schedule")
     assert len(fetched) == 1
-    assert fetched[0][1].query["start"] == "2026-11-23T00:00:00+01:00"
+    assert fetched[0][2]["start"] == "2026-11-23T00:00:00+01:00"
 
 
 async def test_get_events_chunked(
@@ -75,11 +75,11 @@ async def test_get_events_chunked(
     """Ranges longer than 62 days are split into backend-sized chunks."""
     aioclient_mock.mock_calls.clear()
     await _get_events(hass, datetime(2026, 9, 1, tzinfo=TZ), datetime(2027, 1, 1, tzinfo=TZ))
-    fetched = calls(aioclient_mock, "GET", "/v1/schedule")
+    fetched = calls(aioclient_mock, "POST", "/v1/operations/get_schedule")
     assert len(fetched) == 2
-    first_start = datetime.fromisoformat(fetched[0][1].query["start"])
-    first_end = datetime.fromisoformat(fetched[0][1].query["end"])
-    second_start = datetime.fromisoformat(fetched[1][1].query["start"])
+    first_start = datetime.fromisoformat(fetched[0][2]["start"])
+    first_end = datetime.fromisoformat(fetched[0][2]["end"])
+    second_start = datetime.fromisoformat(fetched[1][2]["start"])
     assert (first_end - first_start).days == 62
     assert second_start == first_end
 
@@ -89,7 +89,7 @@ async def test_get_events_error(
 ) -> None:
     """Backend failures surface as HomeAssistantError."""
     aioclient_mock.clear_requests()
-    aioclient_mock.get(f"{BASE}/v1/schedule", status=500)
+    aioclient_mock.post(f"{BASE}/v1/operations/get_schedule", status=500)
     with pytest.raises(HomeAssistantError):
         await _get_events(
             hass, datetime(2026, 11, 23, tzinfo=TZ), datetime(2026, 11, 24, tzinfo=TZ)

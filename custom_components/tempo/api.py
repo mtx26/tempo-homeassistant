@@ -130,63 +130,51 @@ class TempoApiClient:
         """GET /v1/status: validates the token."""
         return cast(dict[str, Any], await self._get("/v1/status"))
 
-    async def summary(self) -> dict[str, Any]:
-        """GET /v1/summary."""
-        return cast(dict[str, Any], await self._get("/v1/summary"))
-
-    async def schedule(self, start: datetime, end: datetime) -> list[dict[str, Any]]:
-        """GET /v1/schedule for [start, end) (maximum 62 days)."""
-        return cast(
-            list[dict[str, Any]],
-            await self._get(
-                "/v1/schedule", params={"start": start.isoformat(), "end": end.isoformat()}
-            ),
-        )
-
-    # --- tasks ------------------------------------------------------------------------------
-
-    async def tasks(self) -> list[dict[str, Any]]:
-        """GET /v1/tasks."""
-        return cast(list[dict[str, Any]], await self._get("/v1/tasks"))
-
-    # --- location / places / settings -------------------------------------
-
     async def post_location(self, payload: dict[str, Any]) -> None:
-        """POST /v1/location."""
+        """POST /v1/location: the phone's real GPS position (telemetry, not an operation)."""
         await self._send("POST", "/v1/location", payload)
 
+    # --- reads and technical settings: the same operation catalogue as the conversation --
+
+    async def summary(self) -> dict[str, Any]:
+        """Operation get_summary."""
+        return await self.result("get_summary")
+
+    async def schedule(self, start: datetime, end: datetime) -> list[dict[str, Any]]:
+        """Operation get_schedule for [start, end) (maximum 62 days)."""
+        found = await self.result(
+            "get_schedule", {"start": start.isoformat(), "end": end.isoformat()}
+        )
+        return list(found["items"])
+
+    async def tasks(self) -> list[dict[str, Any]]:
+        """Operation list_tasks (non-archived tasks)."""
+        return list((await self.result("list_tasks"))["tasks"])
+
     async def places(self) -> list[dict[str, Any]]:
-        """GET /v1/places."""
-        return cast(list[dict[str, Any]], await self._get("/v1/places"))
+        """Operation list_places."""
+        return list((await self.result("list_places"))["places"])
 
-    async def settings(self) -> dict[str, Any]:
-        """GET /v1/settings."""
-        return cast(dict[str, Any], await self._get("/v1/settings"))
-
-    async def patch_settings(self, payload: dict[str, Any]) -> None:
-        """PATCH /v1/settings."""
-        await self._send("PATCH", "/v1/settings", payload)
-
-    # --- activities / blocks ----------------------------------------------------------------
-
-    async def activities(self) -> list[dict[str, Any]]:
-        """GET /v1/activities."""
-        return cast(list[dict[str, Any]], await self._get("/v1/activities"))
-
-    # --- proposals / notifications / interpret ---------------------------------------------
+    async def context(self) -> dict[str, Any]:
+        """Operation get_context: home place, tracker, horizon, margins, planned locations."""
+        return await self.result("get_context")
 
     async def proposals(self) -> list[dict[str, Any]]:
-        """GET /v1/proposals."""
-        return cast(list[dict[str, Any]], await self._get("/v1/proposals"))
+        """Operation list_proposals (pending)."""
+        return list((await self.result("list_proposals"))["proposals"])
 
-    async def notifications(self, unread: bool = True) -> list[dict[str, Any]]:
-        """GET /v1/notifications."""
-        params = {"unread": "true"} if unread else None
-        return cast(list[dict[str, Any]], await self._get("/v1/notifications", params=params))
+    async def notifications(self) -> list[dict[str, Any]]:
+        """Operation list_notifications (unread)."""
+        found = await self.result("list_notifications", {"unread_only": True, "limit": 50})
+        return list(found["notifications"])
 
     async def ack_notification(self, notification_id: str) -> None:
-        """POST /v1/notifications/{id}/ack."""
-        await self._send("POST", f"/v1/notifications/{_seg(notification_id)}/ack")
+        """Operation acknowledge_notification."""
+        await self.result("acknowledge_notification", {"id": notification_id})
+
+    async def update_settings(self, values: dict[str, Any]) -> None:
+        """Operation update_settings (technical setup: tracker, home place)."""
+        await self.result("update_settings", values)
 
     async def conversation(self, text: str, conversation_id: str | None) -> dict[str, Any]:
         """POST /v1/conversation: natural-language request, real outcome in ``reply``."""
@@ -196,10 +184,15 @@ class TempoApiClient:
         return cast(dict[str, Any], await self._send("POST", "/v1/conversation", payload))
 
     async def operation(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
-        """POST /v1/operations/{name} (technical setup only, e.g. the home zone)."""
+        """POST /v1/operations/{name}: ``{"ok": true, "result": ...}`` (422 when refused)."""
         return cast(
             dict[str, Any], await self._send("POST", f"/v1/operations/{_seg(name)}", arguments)
         )
+
+    async def result(self, name: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Run an operation and return its result."""
+        outcome = await self.operation(name, arguments or {})
+        return cast(dict[str, Any], outcome["result"])
 
     # --- helpers ----------------------------------------------------------------------------
 

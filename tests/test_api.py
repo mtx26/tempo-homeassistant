@@ -42,7 +42,7 @@ async def test_errors(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) 
     """4xx with detail and invalid JSON are typed."""
     client = TempoApiClient(async_get_clientsession(hass), BASE, TOKEN)
     aioclient_mock.post(f"{BASE}/v1/conversation", status=422, json={"detail": "text too long"})
-    aioclient_mock.get(f"{BASE}/v1/tasks", text="not json")
+    aioclient_mock.post(f"{BASE}/v1/operations/list_tasks", text="not json")
     with pytest.raises(TempoApiError, match="text too long") as err:
         await client.conversation("x", None)
     assert err.value.status == 422

@@ -53,7 +53,7 @@ async def test_full_flow(hass: HomeAssistant, aioclient_mock: AiohttpClientMocke
         CONF_TRACKER_ENTITY_ID: TRACKER,
     }
     assert result["result"].unique_id == BASE
-    patches = calls(aioclient_mock, "PATCH", "/v1/settings")
+    patches = calls(aioclient_mock, "POST", "/v1/operations/update_settings")
     assert patches[0][2] == {"tracker_entity_id": TRACKER}
 
 
@@ -100,7 +100,7 @@ async def test_invalid_url(hass: HomeAssistant) -> None:
 async def test_tracker_step_error(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
     """A backend failure while storing the tracker is reported."""
     aioclient_mock.get(f"{BASE}/v1/status", json={"version": "1", "timezone": "UTC"})
-    aioclient_mock.patch(f"{BASE}/v1/settings", status=500)
+    aioclient_mock.post(f"{BASE}/v1/operations/update_settings", status=500)
     flow_id = await _start(hass)
     await hass.config_entries.flow.async_configure(flow_id, USER_INPUT)
     result = await hass.config_entries.flow.async_configure(
@@ -180,7 +180,7 @@ async def test_options_flow(
         CONF_SCAN_INTERVAL: 120,
         CONF_NOTIFY_SERVICE: "notify.mobile_app_phone",
     }
-    assert calls(aioclient_mock, "PATCH", "/v1/settings")[-1][2] == {
+    assert calls(aioclient_mock, "POST", "/v1/operations/update_settings")[-1][2] == {
         "tracker_entity_id": "device_tracker.other"
     }
     # Reloaded with the new interval.
