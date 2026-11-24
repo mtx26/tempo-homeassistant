@@ -42,8 +42,8 @@ async def test_setup_and_unload(
     assert await hass.config_entries.async_unload(init_integration.entry_id)
     await hass.async_block_till_done()
     assert init_integration.state is ConfigEntryState.NOT_LOADED
-    # Services stay registered (registered in async_setup).
-    assert hass.services.has_service(DOMAIN, "replan")
+    # No business service actions: everything goes through the conversation.
+    assert hass.services.async_services_for_domain(DOMAIN) == {}
 
 
 async def test_setup_auth_failed_starts_reauth(

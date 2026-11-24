@@ -135,7 +135,7 @@ def _int(key: str) -> Callable[[TempoData], int | None]:
 
 
 def _proposal_attrs(data: TempoData) -> dict[str, Any]:
-    """Pending proposals, oldest first (same order as the proposal buttons)."""
+    """Pending proposals, oldest first."""
     return {
         "proposals": [
             {

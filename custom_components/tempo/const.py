@@ -11,9 +11,7 @@ LOGGER = logging.getLogger(__package__)
 
 CONF_TRACKER_ENTITY_ID: Final = "tracker_entity_id"
 CONF_NOTIFY_SERVICE: Final = "notify_service"
-CONF_DASHBOARD: Final = "dashboard"
-CONF_DASHBOARD_REQUIRE_ADMIN: Final = "dashboard_require_admin"
-CONF_HOME_PLACE_ID: Final = "home_place_id"
+CONF_HOME_FROM_ZONE: Final = "home_from_zone"
 
 DEFAULT_SCAN_INTERVAL: Final = 60
 MIN_SCAN_INTERVAL: Final = 30
@@ -28,14 +26,6 @@ MAX_SCHEDULE_RANGE: Final = timedelta(days=62)
 # Position push throttling.
 LOCATION_MIN_INTERVAL: Final = timedelta(seconds=60)
 LOCATION_MIN_DISTANCE_M: Final = 100.0
-
-# Default study effort when a to-do item is created without "<n> min" in its description.
-DEFAULT_TASK_EFFORT_MINUTES: Final = 60
-
-# Mobile app actionable notifications.
-MOBILE_ACTION_EVENT: Final = "mobile_app_notification_action"
-ACTION_APPROVE_PREFIX: Final = "TEMPO_APPROVE_"
-ACTION_REJECT_PREFIX: Final = "TEMPO_REJECT_"
 
 DEPARTURE_ALERT_STATUSES: Final = frozenset({"leave_now", "leave_earlier", "at_risk", "late"})
 DEPARTURE_STATUSES: Final = [

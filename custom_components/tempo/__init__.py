@@ -1,7 +1,10 @@
 """Tempo integration for Home Assistant.
 
-Home Assistant is the only user interface of Tempo, a self-hosted personal planner. This
-integration talks to the private Tempo backend over the internal network with a bearer token.
+Tempo is a self-hosted personal planner managed by natural-language conversation. This
+integration provides the Assist conversation agent, a read-only calendar, sensors and the
+remaining-work list, pushes the phone GPS position and surfaces notifications. It exposes no
+business form, button or service: every change goes through the conversation. It talks to the
+private Tempo backend over the internal network with a bearer token.
 """
 
 from __future__ import annotations
@@ -9,35 +12,17 @@ from __future__ import annotations
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_API_TOKEN, CONF_URL, CONF_VERIFY_SSL, Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import (
-    ConfigEntryAuthFailed,
-    ConfigEntryNotReady,
-    HomeAssistantError,
-)
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.typing import ConfigType
 
 from .api import TempoApiClient, TempoAuthError, TempoError
-from .const import (
-    CONF_DASHBOARD,
-    CONF_DASHBOARD_REQUIRE_ADMIN,
-    CONF_TRACKER_ENTITY_ID,
-    DOMAIN,
-    LOGGER,
-)
+from .const import CONF_TRACKER_ENTITY_ID, DOMAIN, LOGGER
 from .coordinator import TempoConfigEntry, TempoCoordinator, TempoRuntimeData
-from .dashboard import (
-    async_register_dashboard,
-    async_track_proposals,
-    async_unregister_dashboard,
-)
 from .location import TempoLocationPusher
 from .notify_bridge import TempoNotificationBridge
-from .services import async_setup_services
 
 PLATFORMS: list[Platform] = [
-    Platform.BUTTON,
     Platform.CALENDAR,
     Platform.CONVERSATION,
     Platform.SENSOR,
@@ -45,12 +30,6 @@ PLATFORMS: list[Platform] = [
 ]
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
-
-
-async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Register the service actions once."""
-    async_setup_services(hass)
-    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: TempoConfigEntry) -> bool:
@@ -90,17 +69,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: TempoConfigEntry) -> boo
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    if entry.options.get(CONF_DASHBOARD):
-        try:
-            async_register_dashboard(
-                hass,
-                entry.entry_id,
-                require_admin=bool(entry.options.get(CONF_DASHBOARD_REQUIRE_ADMIN)),
-            )
-        except HomeAssistantError as err:
-            LOGGER.warning("Tempo dashboard not registered: %s", err)
-    entry.async_on_unload(async_track_proposals(hass, entry))
-    entry.async_on_unload(lambda: async_unregister_dashboard(hass, entry.entry_id))
     return True
 
 

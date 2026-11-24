@@ -1,42 +1,30 @@
-"""Surface Tempo notifications, approvals and departure alerts in Home Assistant.
+"""Surface Tempo notifications, proposals and departure alerts in Home Assistant.
+
+Notifications are informative only: they carry no action button. Approving or refusing a
+proposal, or changing anything, is done by talking to the Tempo assistant.
 
 * every new unread backend notification becomes a persistent notification
-  (``tempo_<id>``) and is then acknowledged in the backend so it is not shown twice;
-* pending proposals are pushed once to the optional notify service as actionable mobile
-  notifications (``TEMPO_APPROVE_<id>`` / ``TEMPO_REJECT_<id>``);
-* departure alerts are raised once per (event, status);
-* ``mobile_app_notification_action`` events approve or reject the proposal, but only for
-  proposal ids that this bridge itself sent in a notification during the last
-  :data:`SENT_PROPOSAL_TTL` (other ids are ignored), and only when the event comes from a
-  real, active, non-system Home Assistant user if it carries a ``user_id``. Any phone of the
-  household registered in the mobile app (and receiving the notification) can therefore
-  approve.
+  (``tempo_<id>``), is pushed to the optional notify service, and is then acknowledged in the
+  backend so it is not shown twice;
+* pending proposals are pushed once to the optional notify service, with a hint to answer
+  the assistant;
+* departure alerts are raised once per (event, status).
 """
 
 from __future__ import annotations
 
-import time
 from collections.abc import Callable
-from datetime import timedelta
 from typing import Any
 
 from homeassistant.components import persistent_notification
-from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 
-from .api import TempoConflictError, TempoError
-from .const import (
-    ACTION_APPROVE_PREFIX,
-    ACTION_REJECT_PREFIX,
-    CONF_NOTIFY_SERVICE,
-    DEPARTURE_ALERT_STATUSES,
-    DOMAIN,
-    LOGGER,
-    MOBILE_ACTION_EVENT,
-)
+from .api import TempoError
+from .const import CONF_NOTIFY_SERVICE, DEPARTURE_ALERT_STATUSES, DOMAIN, LOGGER
 from .coordinator import TempoConfigEntry, TempoCoordinator
 
-SENT_PROPOSAL_TTL = timedelta(hours=48)
+PROPOSAL_HINT = "Répondez à Tempo, par exemple « accepte la proposition » ou « refuse »."
 
 DEPARTURE_TEXT = {
     "leave_now": "Partez maintenant",
@@ -58,8 +46,6 @@ class TempoNotificationBridge:
         self._coordinator = coordinator
         self._surfaced: set[str] = set()
         self._notified_proposals: set[str] = set()
-        # proposal id -> monotonic time it was sent in an actionable notification.
-        self._sent: dict[str, float] = {}
         self._departure_alerts: set[tuple[str, str]] = set()
         self._unsubs: list[Callable[[], None]] = []
 
@@ -71,9 +57,8 @@ class TempoNotificationBridge:
 
     @callback
     def async_start(self) -> None:
-        """Listen to coordinator updates and mobile actions; process current data."""
+        """Listen to coordinator updates; process current data."""
         self._unsubs.append(self._coordinator.async_add_listener(self._async_process))
-        self._unsubs.append(self._hass.bus.async_listen(MOBILE_ACTION_EVENT, self._async_action))
         self._async_process()
 
     @callback
@@ -109,6 +94,13 @@ class TempoNotificationBridge:
                 notification_id=f"tempo_{notification_id}",
             )
             self._surfaced.add(notification_id)
+            if (service := self.notify_service) is not None:
+                self._call_notify(
+                    service,
+                    str(notification.get("title") or "Tempo"),
+                    str(notification.get("message") or ""),
+                    {"tag": f"tempo_{notification_id}"},
+                )
         # Acknowledge (again if a previous attempt failed: it is still listed as unread).
         self._hass.async_create_task(self._async_ack(notification_id), eager_start=True)
 
@@ -125,25 +117,8 @@ class TempoNotificationBridge:
         if proposal_id in self._notified_proposals:
             return
         self._notified_proposals.add(proposal_id)
-        message = str(proposal.get("details") or proposal.get("title") or "")
-        data = {
-            "tag": f"tempo_proposal_{proposal_id}",
-            "actions": [
-                {"action": f"{ACTION_APPROVE_PREFIX}{proposal_id}", "title": "Approuver"},
-                {"action": f"{ACTION_REJECT_PREFIX}{proposal_id}", "title": "Refuser"},
-            ],
-        }
         title = f"Tempo : {proposal.get('title') or 'modification à approuver'}"
-        self._sent[proposal_id] = time.monotonic()
-        self._call_notify(service, title, message, data)
-
-    def _was_sent(self, proposal_id: str) -> bool:
-        """True if this bridge sent ``proposal_id`` recently (expired ids are dropped)."""
-        now = time.monotonic()
-        ttl = SENT_PROPOSAL_TTL.total_seconds()
-        for key in [k for k, sent_at in self._sent.items() if now - sent_at > ttl]:
-            del self._sent[key]
-        return proposal_id in self._sent
+        self._call_notify(service, title, PROPOSAL_HINT, {"tag": f"tempo_proposal_{proposal_id}"})
 
     def _departure_alert(self, check: dict[str, Any], travel: dict[str, Any] | None) -> None:
         status = check.get("status")
@@ -189,47 +164,3 @@ class TempoNotificationBridge:
             )
         except HomeAssistantError as err:
             LOGGER.warning("Could not call %s.%s: %s", domain, name, err)
-
-    @callback
-    def _async_action(self, event: Event) -> None:
-        action = event.data.get("action")
-        if not isinstance(action, str):
-            return
-        if action.startswith(ACTION_APPROVE_PREFIX):
-            proposal_id, approve = action.removeprefix(ACTION_APPROVE_PREFIX), True
-        elif action.startswith(ACTION_REJECT_PREFIX):
-            proposal_id, approve = action.removeprefix(ACTION_REJECT_PREFIX), False
-        else:
-            return
-        if not proposal_id or not self._was_sent(proposal_id):
-            LOGGER.warning("Ignoring a Tempo action for a proposal this entry did not send")
-            return
-        # Consumed now (synchronously) so a second tap cannot decide the proposal twice.
-        sent_at = self._sent.pop(proposal_id)
-        self._hass.async_create_task(
-            self._async_decide(proposal_id, approve, event.context.user_id, sent_at),
-            eager_start=True,
-        )
-
-    async def _async_user_allowed(self, user_id: str | None) -> bool:
-        if user_id is None:
-            return True
-        user = await self._hass.auth.async_get_user(user_id)
-        return user is not None and user.is_active and not user.system_generated
-
-    async def _async_decide(
-        self, proposal_id: str, approve: bool, user_id: str | None, sent_at: float
-    ) -> None:
-        if not await self._async_user_allowed(user_id):
-            LOGGER.warning("Ignoring a Tempo action from a system or unknown user")
-            self._sent[proposal_id] = sent_at
-            return
-        try:
-            await self._coordinator.client.decide_proposal(proposal_id, approve)
-        except TempoConflictError:
-            LOGGER.info("Tempo proposal %s was already decided", proposal_id)
-        except TempoError as err:
-            LOGGER.warning("Could not decide Tempo proposal %s: %s", proposal_id, err)
-            self._sent[proposal_id] = sent_at  # allow a retry from the notification
-            return
-        await self._coordinator.async_request_refresh()

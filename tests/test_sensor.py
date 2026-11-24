@@ -124,7 +124,7 @@ async def test_trainings_to_confirm_empty(
     assert state.attributes["activities"] == []
 
 
-async def test_proposal_attributes_sorted_like_buttons(
+async def test_proposal_attributes_sorted_oldest_first(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, mock_config_entry: MockConfigEntry
 ) -> None:
     """Pending proposals are listed oldest first (created_at), decided ones are skipped."""
@@ -138,6 +138,4 @@ async def test_proposal_attributes_sorted_like_buttons(
     state = hass.states.get("sensor.tempo_pending_approvals")
     assert state is not None
     assert [p["id"] for p in state.attributes["proposals"]] == ["p-old", "p-new"]
-    button = hass.states.get("button.tempo_approve_oldest_proposal")
-    assert button is not None
-    assert button.attributes["proposal_id"] == state.attributes["proposals"][0]["id"]
+    assert hass.states.get("button.tempo_approve_oldest_proposal") is None

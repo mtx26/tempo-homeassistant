@@ -143,25 +143,11 @@ class TempoApiClient:
             ),
         )
 
-    async def replan(self) -> dict[str, Any]:
-        """POST /v1/replan (asynchronous; returns 202)."""
-        return cast(dict[str, Any], await self._send("POST", "/v1/replan") or {})
-
     # --- tasks ------------------------------------------------------------------------------
 
     async def tasks(self) -> list[dict[str, Any]]:
         """GET /v1/tasks."""
         return cast(list[dict[str, Any]], await self._get("/v1/tasks"))
-
-    async def create_task(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """POST /v1/tasks."""
-        return cast(dict[str, Any], await self._send("POST", "/v1/tasks", payload))
-
-    async def update_task(self, task_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-        """PATCH /v1/tasks/{id}."""
-        return cast(
-            dict[str, Any], await self._send("PATCH", f"/v1/tasks/{_seg(task_id)}", payload)
-        )
 
     # --- location / places / availability / settings -------------------------------------
 
@@ -173,21 +159,9 @@ class TempoApiClient:
         """GET /v1/places."""
         return cast(list[dict[str, Any]], await self._get("/v1/places"))
 
-    async def put_place(self, place_id: str, payload: dict[str, Any]) -> None:
-        """PUT /v1/places/{id}."""
-        await self._send("PUT", f"/v1/places/{_seg(place_id)}", payload)
-
-    async def delete_place(self, place_id: str) -> None:
-        """DELETE /v1/places/{id}."""
-        await self._send("DELETE", f"/v1/places/{_seg(place_id)}")
-
     async def availability(self) -> list[dict[str, Any]]:
         """GET /v1/availability."""
         return cast(list[dict[str, Any]], await self._get("/v1/availability"))
-
-    async def put_availability(self, windows: list[dict[str, Any]]) -> None:
-        """PUT /v1/availability (full replacement)."""
-        await self._send("PUT", "/v1/availability", windows)
 
     async def settings(self) -> dict[str, Any]:
         """GET /v1/settings."""
@@ -203,43 +177,11 @@ class TempoApiClient:
         """GET /v1/activities."""
         return cast(list[dict[str, Any]], await self._get("/v1/activities"))
 
-    async def create_activity(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """POST /v1/activities."""
-        return cast(dict[str, Any], await self._send("POST", "/v1/activities", payload))
-
-    async def update_activity(self, activity_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-        """PATCH /v1/activities/{id}."""
-        return cast(
-            dict[str, Any],
-            await self._send("PATCH", f"/v1/activities/{_seg(activity_id)}", payload),
-        )
-
-    async def confirm_activity(self, activity_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-        """POST /v1/activities/{id}/confirm (409 if not to_confirm, 422 if invalid)."""
-        return cast(
-            dict[str, Any],
-            await self._send("POST", f"/v1/activities/{_seg(activity_id)}/confirm", payload),
-        )
-
-    async def block_action(self, block_id: str, action: str) -> None:
-        """POST /v1/blocks/{id}/lock|unlock|done."""
-        if action not in ("lock", "unlock", "done"):
-            raise ValueError(f"unsupported block action {action}")
-        await self._send("POST", f"/v1/blocks/{_seg(block_id)}/{action}")
-
     # --- proposals / notifications / interpret ---------------------------------------------
 
     async def proposals(self) -> list[dict[str, Any]]:
         """GET /v1/proposals."""
         return cast(list[dict[str, Any]], await self._get("/v1/proposals"))
-
-    async def decide_proposal(self, proposal_id: str, approve: bool) -> dict[str, Any]:
-        """POST /v1/proposals/{id}/approve|reject."""
-        action = "approve" if approve else "reject"
-        return cast(
-            dict[str, Any],
-            await self._send("POST", f"/v1/proposals/{_seg(proposal_id)}/{action}") or {},
-        )
 
     async def notifications(self, unread: bool = True) -> list[dict[str, Any]]:
         """GET /v1/notifications."""
@@ -250,9 +192,18 @@ class TempoApiClient:
         """POST /v1/notifications/{id}/ack."""
         await self._send("POST", f"/v1/notifications/{_seg(notification_id)}/ack")
 
-    async def interpret(self, text: str) -> dict[str, Any]:
-        """POST /v1/interpret (natural-language helper, optional on older backends)."""
-        return cast(dict[str, Any], await self._send("POST", "/v1/interpret", {"text": text}))
+    async def conversation(self, text: str, conversation_id: str | None) -> dict[str, Any]:
+        """POST /v1/conversation: natural-language request, real outcome in ``reply``."""
+        payload: dict[str, Any] = {"text": text}
+        if conversation_id:
+            payload["conversation_id"] = conversation_id[:100]
+        return cast(dict[str, Any], await self._send("POST", "/v1/conversation", payload))
+
+    async def operation(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        """POST /v1/operations/{name} (technical setup only, e.g. the home zone)."""
+        return cast(
+            dict[str, Any], await self._send("POST", f"/v1/operations/{_seg(name)}", arguments)
+        )
 
     # --- helpers ----------------------------------------------------------------------------
 

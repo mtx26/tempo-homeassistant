@@ -40,83 +40,10 @@
         "default": "mdi:clipboard-list"
       }
     },
-    "button": {
-      "replan": {
-        "default": "mdi:calendar-refresh"
-      },
-      "approve_oldest_proposal": {
-        "default": "mdi:check-circle"
-      },
-      "reject_oldest_proposal": {
-        "default": "mdi:close-circle"
-      }
-    },
     "conversation": {
       "assistant": {
         "default": "mdi:message-text"
       }
-    }
-  },
-  "services": {
-    "add_task": {
-      "service": "mdi:clipboard-plus"
-    },
-    "replan": {
-      "service": "mdi:calendar-refresh"
-    },
-    "approve_proposal": {
-      "service": "mdi:check-circle"
-    },
-    "reject_proposal": {
-      "service": "mdi:close-circle"
-    },
-    "lock_block": {
-      "service": "mdi:lock"
-    },
-    "unlock_block": {
-      "service": "mdi:lock-open"
-    },
-    "complete_block": {
-      "service": "mdi:check"
-    },
-    "add_training": {
-      "service": "mdi:run"
-    },
-    "add_race": {
-      "service": "mdi:flag-checkered"
-    },
-    "set_place": {
-      "service": "mdi:map-marker-plus"
-    },
-    "set_availability": {
-      "service": "mdi:calendar-range"
-    },
-    "acknowledge_notification": {
-      "service": "mdi:bell-check"
-    },
-    "interpret": {
-      "service": "mdi:message-text"
-    },
-    "confirm_activity": {
-      "service": "mdi:check-decagram"
-    },
-    "install_dashboard": {
-      "service": "mdi:view-dashboard"
-    },
-    "remove_dashboard": {
-      "service": "mdi:view-dashboard-outline"
-    },
-    "set_home": {
-      "service": "mdi:home-edit"
-    },
-    "set_settings": {
-      "service": "mdi:tune"
-    },
-    "add_stay": {
-      "service": "mdi:home-plus"
-    },
-    "clear_stays": {
-      "service": "mdi:home-remove"
     }
   }
 }

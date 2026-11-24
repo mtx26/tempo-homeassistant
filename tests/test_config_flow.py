@@ -12,8 +12,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry, async_
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.tempo.const import (
-    CONF_DASHBOARD,
-    CONF_DASHBOARD_REQUIRE_ADMIN,
+    CONF_HOME_FROM_ZONE,
     CONF_NOTIFY_SERVICE,
     CONF_TRACKER_ENTITY_ID,
     DOMAIN,
@@ -180,8 +179,6 @@ async def test_options_flow(
         CONF_TRACKER_ENTITY_ID: "device_tracker.other",
         CONF_SCAN_INTERVAL: 120,
         CONF_NOTIFY_SERVICE: "notify.mobile_app_phone",
-        CONF_DASHBOARD: False,
-        CONF_DASHBOARD_REQUIRE_ADMIN: False,
     }
     assert calls(aioclient_mock, "PATCH", "/v1/settings")[-1][2] == {
         "tracker_entity_id": "device_tracker.other"
@@ -190,3 +187,28 @@ async def test_options_flow(
     coordinator = init_integration.runtime_data.coordinator
     assert coordinator.update_interval is not None
     assert coordinator.update_interval.total_seconds() == 120
+
+
+async def test_options_home_from_zone(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, init_integration: MockConfigEntry
+) -> None:
+    """The HA home zone is registered as the Tempo place "home" (technical setup only)."""
+    hass.config.latitude, hass.config.longitude = 50.45, 3.95
+    aioclient_mock.post(f"{BASE}/v1/operations/upsert_place", json={"ok": True})
+    aioclient_mock.post(f"{BASE}/v1/operations/update_settings", json={"ok": True})
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            CONF_TRACKER_ENTITY_ID: TRACKER,
+            CONF_SCAN_INTERVAL: 60,
+            CONF_HOME_FROM_ZONE: True,
+        },
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    place = calls(aioclient_mock, "POST", "/v1/operations/upsert_place")[-1][2]
+    assert place["place_id"] == "home"
+    assert (place["latitude"], place["longitude"]) == (50.45, 3.95)
+    settings = calls(aioclient_mock, "POST", "/v1/operations/update_settings")[-1][2]
+    assert settings == {"home_place_id": "home"}
+    await hass.async_block_till_done()

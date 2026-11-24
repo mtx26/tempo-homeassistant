@@ -20,10 +20,6 @@ from homeassistant.helpers.selector import (
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
-    SelectOptionDict,
-    SelectSelector,
-    SelectSelectorConfig,
-    SelectSelectorMode,
     TextSelector,
     TextSelectorConfig,
     TextSelectorType,
@@ -38,9 +34,7 @@ from .api import (
     normalize_url,
 )
 from .const import (
-    CONF_DASHBOARD,
-    CONF_DASHBOARD_REQUIRE_ADMIN,
-    CONF_HOME_PLACE_ID,
+    CONF_HOME_FROM_ZONE,
     CONF_NOTIFY_SERVICE,
     CONF_TRACKER_ENTITY_ID,
     DEFAULT_SCAN_INTERVAL,
@@ -202,10 +196,11 @@ class TempoConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class TempoOptionsFlow(OptionsFlowWithReload):
-    """Tracker, home place, polling interval, notify service and dashboard options.
+    """Technical options: phone tracker, polling interval, notify service.
 
-    The home place is stored in the backend settings (``home_place_id``), not in the entry
-    options: it is chosen among the places already defined with ``tempo.set_place``.
+    ``home_from_zone`` (one-shot) registers Home Assistant's home zone as the Tempo place
+    ``home`` and makes it the home place. Everything else (places, rules, tasks, events) is
+    managed by conversation with the Tempo assistant.
     """
 
     def _client(self) -> TempoApiClient:
@@ -220,30 +215,31 @@ class TempoOptionsFlow(OptionsFlowWithReload):
             entry.data.get(CONF_VERIFY_SSL, True),
         )
 
-    async def _places_and_home(
-        self, client: TempoApiClient
-    ) -> tuple[list[SelectOptionDict], str | None]:
-        """Existing places and the current home (empty when the backend is unreachable)."""
+    async def _home_from_zone(self, client: TempoApiClient) -> dict[str, str]:
+        config = self.hass.config
         try:
-            places = await client.places()
-            settings = await client.settings()
+            await client.operation(
+                "upsert_place",
+                {
+                    "place_id": "home",
+                    "name": config.location_name or "Domicile",
+                    "latitude": config.latitude,
+                    "longitude": config.longitude,
+                },
+            )
+            await client.operation("update_settings", {"home_place_id": "home"})
+        except TempoAuthError:
+            return {"base": "invalid_auth"}
         except TempoError as err:
-            LOGGER.warning("Could not read Tempo places for the options flow: %s", err)
-            return [], None
-        options = [
-            SelectOptionDict(value=str(p["id"]), label=f"{p.get('name') or p['id']} ({p['id']})")
-            for p in places
-            if p.get("id")
-        ]
-        home = settings.get(CONF_HOME_PLACE_ID)
-        return options, str(home) if home else None
+            LOGGER.warning("Could not register the home zone in Tempo: %s", err)
+            return {"base": "cannot_connect"}
+        return {}
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Manage the options."""
         entry = self.config_entry
         errors: dict[str, str] = {}
         client = self._client()
-        places, current_home = await self._places_and_home(client)
         current_tracker = entry.options.get(
             CONF_TRACKER_ENTITY_ID, entry.data.get(CONF_TRACKER_ENTITY_ID)
         )
@@ -254,22 +250,15 @@ class TempoOptionsFlow(OptionsFlowWithReload):
                 or not self.hass.services.has_service("notify", notify.removeprefix("notify."))
             ):
                 errors[CONF_NOTIFY_SERVICE] = "invalid_notify_service"
-            home = user_input.get(CONF_HOME_PLACE_ID)
-            if home and home not in {option["value"] for option in places}:
-                errors[CONF_HOME_PLACE_ID] = "unknown_place"
             tracker = user_input[CONF_TRACKER_ENTITY_ID]
             if not errors and tracker != current_tracker:
                 errors = await _push_tracker(client, tracker)
-            if not errors and home and home != current_home:
-                errors = await _patch_settings(client, {CONF_HOME_PLACE_ID: home})
+            if not errors and user_input.get(CONF_HOME_FROM_ZONE):
+                errors = await self._home_from_zone(client)
             if not errors:
                 options: dict[str, Any] = {
                     CONF_TRACKER_ENTITY_ID: tracker,
                     CONF_SCAN_INTERVAL: int(user_input[CONF_SCAN_INTERVAL]),
-                    CONF_DASHBOARD: bool(user_input.get(CONF_DASHBOARD, False)),
-                    CONF_DASHBOARD_REQUIRE_ADMIN: bool(
-                        user_input.get(CONF_DASHBOARD_REQUIRE_ADMIN, False)
-                    ),
                 }
                 if notify:
                     options[CONF_NOTIFY_SERVICE] = notify
@@ -277,34 +266,23 @@ class TempoOptionsFlow(OptionsFlowWithReload):
 
         fields: dict[vol.Marker, Any] = {
             vol.Required(CONF_TRACKER_ENTITY_ID): TRACKER_SELECTOR,
+            vol.Required(CONF_SCAN_INTERVAL): NumberSelector(
+                NumberSelectorConfig(
+                    min=MIN_SCAN_INTERVAL,
+                    max=3600,
+                    step=1,
+                    unit_of_measurement="s",
+                    mode=NumberSelectorMode.BOX,
+                )
+            ),
+            vol.Optional(CONF_NOTIFY_SERVICE): str,
+            vol.Optional(CONF_HOME_FROM_ZONE, default=False): bool,
         }
-        if places:
-            fields[vol.Optional(CONF_HOME_PLACE_ID)] = SelectSelector(
-                SelectSelectorConfig(options=places, mode=SelectSelectorMode.DROPDOWN)
-            )
-        fields.update(
-            {
-                vol.Required(CONF_SCAN_INTERVAL): NumberSelector(
-                    NumberSelectorConfig(
-                        min=MIN_SCAN_INTERVAL,
-                        max=3600,
-                        step=1,
-                        unit_of_measurement="s",
-                        mode=NumberSelectorMode.BOX,
-                    )
-                ),
-                vol.Optional(CONF_NOTIFY_SERVICE): str,
-                vol.Optional(CONF_DASHBOARD, default=False): bool,
-                vol.Optional(CONF_DASHBOARD_REQUIRE_ADMIN, default=False): bool,
-            }
-        )
         suggested = {
             CONF_TRACKER_ENTITY_ID: current_tracker,
-            CONF_HOME_PLACE_ID: current_home,
             CONF_SCAN_INTERVAL: entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
             CONF_NOTIFY_SERVICE: entry.options.get(CONF_NOTIFY_SERVICE, ""),
-            CONF_DASHBOARD: entry.options.get(CONF_DASHBOARD, False),
-            CONF_DASHBOARD_REQUIRE_ADMIN: entry.options.get(CONF_DASHBOARD_REQUIRE_ADMIN, False),
+            CONF_HOME_FROM_ZONE: False,
         }
         return self.async_show_form(
             step_id="init",

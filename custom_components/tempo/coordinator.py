@@ -46,7 +46,7 @@ class TempoData:
 def pending_proposals(data: TempoData | None) -> list[dict[str, Any]]:
     """Return pending proposals, oldest first (ISO timestamps sort chronologically).
 
-    The sensor attributes, the buttons and the dashboard all use this single ordering.
+    The sensor attributes use this single ordering.
     """
     if data is None:
         return []

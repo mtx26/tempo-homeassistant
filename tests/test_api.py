@@ -32,21 +32,19 @@ async def test_health_without_auth_and_quoting(
     """/health has no Authorization header; ids are quoted in paths."""
     client = TempoApiClient(async_get_clientsession(hass), BASE, TOKEN)
     aioclient_mock.get(f"{BASE}/health", json={"status": "ok"})
-    aioclient_mock.post(f"{BASE}/v1/blocks/a%2Fb/lock", status=204)
+    aioclient_mock.post(f"{BASE}/v1/operations/a%2Fb", json={"ok": True})
     assert await client.health() == {"status": "ok"}
     assert "Authorization" not in calls(aioclient_mock, "GET", "/health")[0][3]
-    await client.block_action("a/b", "lock")
-    with pytest.raises(ValueError):
-        await client.block_action("x", "delete")
+    assert await client.operation("a/b", {}) == {"ok": True}
 
 
 async def test_errors(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
     """4xx with detail and invalid JSON are typed."""
     client = TempoApiClient(async_get_clientsession(hass), BASE, TOKEN)
-    aioclient_mock.post(f"{BASE}/v1/tasks", status=422, json={"detail": "effort too large"})
+    aioclient_mock.post(f"{BASE}/v1/conversation", status=422, json={"detail": "text too long"})
     aioclient_mock.get(f"{BASE}/v1/tasks", text="not json")
-    with pytest.raises(TempoApiError, match="effort too large") as err:
-        await client.create_task({})
+    with pytest.raises(TempoApiError, match="text too long") as err:
+        await client.conversation("x", None)
     assert err.value.status == 422
     with pytest.raises(TempoConnectionError):
         await client.tasks()

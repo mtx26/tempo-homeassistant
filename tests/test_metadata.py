@@ -11,11 +11,9 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
-from homeassistant.util.yaml import load_yaml_dict
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
-from custom_components.tempo.button import BUTTONS
 from custom_components.tempo.config_flow import TempoConfigFlow
 from custom_components.tempo.const import DOMAIN
 from custom_components.tempo.sensor import SENSORS
@@ -58,7 +56,7 @@ def test_manifest() -> None:
         assert manifest[key], key
     assert manifest["domain"] == DOMAIN
     assert re.fullmatch(r"\d+\.\d+\.\d+", manifest["version"])
-    assert manifest["version"] == "0.2.0"
+    assert manifest["version"] == "0.3.0"
     assert manifest["config_flow"] is True
     assert "conversation" in manifest["dependencies"]
     assert manifest["documentation"].startswith("https://")
@@ -121,17 +119,14 @@ def test_translations_cover_code() -> None:
                 and isinstance(node.value, ast.Constant)
             ):
                 used.add(str(node.value.value))
-    entity_keys = (
-        {d.translation_key for d in SENSORS}
-        | {d.translation_key for d in BUTTONS}
-        | {"tasks", "assistant"}
-    )
+    entity_keys = {d.translation_key for d in SENSORS} | {"tasks", "assistant"}
     exception_keys = used - entity_keys
     assert exception_keys <= set(strings["exceptions"]), exception_keys - set(strings["exceptions"])
     for description in SENSORS:
         assert description.translation_key in strings["entity"]["sensor"]
-    for description in BUTTONS:
-        assert description.translation_key in strings["entity"]["button"]
+    assert "button" not in strings["entity"]  # no business buttons: conversation only
+    assert "services" not in strings  # no business service actions
+    assert not (COMPONENT / "services.yaml").exists()
     assert "tasks" in strings["entity"]["todo"]
     assert "assistant" in strings["entity"]["conversation"]
     # Enum sensor states are all translated.
@@ -139,20 +134,6 @@ def test_translations_cover_code() -> None:
         if description.options:
             states = strings["entity"]["sensor"][description.translation_key]["state"]
             assert set(description.options) == set(states), description.key
-
-
-def test_services_and_icons() -> None:
-    """services.yaml, strings.json services and icons.json agree."""
-    services = load_yaml_dict(str(COMPONENT / "services.yaml"))
-    strings = _json(COMPONENT / "strings.json")
-    icons = _json(COMPONENT / "icons.json")
-    assert set(services) == set(strings["services"]) == set(icons["services"])
-    for name, desc in services.items():
-        assert set(desc.get("fields") or {}) == set(strings["services"][name]["fields"]), name
-    for description in SENSORS:
-        assert description.translation_key in icons["entity"]["sensor"]
-    for description in BUTTONS:
-        assert description.translation_key in icons["entity"]["button"]
 
 
 async def test_migrate_entry_from_1_1(

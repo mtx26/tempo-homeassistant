@@ -1,9 +1,11 @@
-"""Conversation agent forwarding user text to the Tempo backend (``POST /v1/interpret``).
+"""Conversation agent: the only way to manage Tempo (``POST /v1/conversation``).
 
-The backend interprets the request (optionally with an LLM) and deterministic code validates
-and applies it; questions are answered with ``action == "answer"``. This agent never invents
-an answer: it speaks the backend ``summary`` or a generic error message; raw backend error
-details and internal URLs are only logged.
+The backend assistant interprets the request (LLM tool use over the typed operation
+catalogue, or the deterministic parser when no LLM is available), applies it through the
+business rules and answers with the real outcome. The Assist conversation id is forwarded so
+follow-ups ("move it to 6 pm") keep their context. This agent never invents an answer: it
+speaks the backend ``reply`` or a generic error message; raw backend error details and
+internal URLs are only logged.
 """
 
 from __future__ import annotations
@@ -76,10 +78,12 @@ class TempoConversationEntity(TempoEntity, conversation.ConversationEntity):
         user_input: conversation.ConversationInput,
         chat_log: conversation.ChatLog,
     ) -> conversation.ConversationResult:
-        """Send the text to /v1/interpret and speak the summary."""
+        """Send the text to /v1/conversation and speak the reply."""
         texts = _messages(user_input.language)
         try:
-            result = await self.coordinator.client.interpret(user_input.text)
+            result = await self.coordinator.client.conversation(
+                user_input.text, chat_log.conversation_id
+            )
         except TempoNotFoundError:
             return self._error(user_input, chat_log, texts["unavailable"])
         except TempoAuthError:
@@ -87,13 +91,11 @@ class TempoConversationEntity(TempoEntity, conversation.ConversationEntity):
             return self._error(user_input, chat_log, texts["auth"])
         except TempoError as err:
             # Details (status, backend message, URLs) go to the log only, never to speech.
-            LOGGER.warning("Tempo interpret request failed: %s", err)
+            LOGGER.warning("Tempo conversation request failed: %s", err)
             return self._error(user_input, chat_log, texts["error"])
 
-        summary = str(result.get("summary") or "").strip()
-        if not result.get("understood") and not summary:
-            summary = texts["not_understood"]
-        if result.get("applied"):
+        summary = str(result.get("reply") or "").strip() or texts["not_understood"]
+        if result.get("changed"):
             await self.coordinator.async_request_refresh()
         chat_log.async_add_assistant_content_without_tools(
             conversation.AssistantContent(agent_id=user_input.agent_id, content=summary)
