@@ -9,7 +9,7 @@ from urllib.parse import quote
 import aiohttp
 from yarl import URL
 
-from .const import CONVERSATION_TIMEOUT_SECONDS, DEFAULT_TIMEOUT_SECONDS
+from .const import CONVERSATION_TIMEOUT_SECONDS, DEFAULT_TIMEOUT_SECONDS, LLM_PROBE_SECONDS
 
 
 class TempoError(Exception):
@@ -176,6 +176,17 @@ class TempoApiClient:
     async def update_settings(self, values: dict[str, Any]) -> None:
         """Operation update_settings (technical setup: tracker, home place)."""
         await self.result("update_settings", values)
+
+    async def llm(self) -> dict[str, Any]:
+        """GET /v1/llm: LLM enabled, model in use, default and selectable models."""
+        return cast(dict[str, Any], await self._get("/v1/llm"))
+
+    async def set_llm_model(self, model: str | None) -> dict[str, Any]:
+        """PUT /v1/llm: the backend probes the model before saving it (422 if inaccessible)."""
+        return cast(
+            dict[str, Any],
+            await self._request("PUT", "/v1/llm", json={"model": model}, seconds=LLM_PROBE_SECONDS),
+        )
 
     async def conversation(self, text: str, conversation_id: str | None) -> dict[str, Any]:
         """POST /v1/conversation: natural-language request, real outcome in ``reply``."""

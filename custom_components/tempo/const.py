@@ -12,10 +12,14 @@ LOGGER = logging.getLogger(__package__)
 CONF_TRACKER_ENTITY_ID: Final = "tracker_entity_id"
 CONF_NOTIFY_SERVICE: Final = "notify_service"
 CONF_HOME_FROM_ZONE: Final = "home_from_zone"
+CONF_LLM_MODEL: Final = "llm_model"
+"""Not stored in the entry: the backend holds the choice (GET/PUT /v1/llm)."""
 
 DEFAULT_SCAN_INTERVAL: Final = 60
 MIN_SCAN_INTERVAL: Final = 30
 DEFAULT_TIMEOUT_SECONDS: Final = 15
+LLM_PROBE_SECONDS: Final = 40
+"""The backend tests the chosen model with one short request before saving it."""
 CONVERSATION_TIMEOUT_SECONDS: Final = 150
 """The backend assistant stops starting model calls after 60 s; one re-plan and the
 final answer still fit: the user hears the real outcome, never a client timeout."""

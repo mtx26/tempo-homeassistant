@@ -31,6 +31,20 @@
         "data": {
           "api_token": "Jeton de service"
         }
+      },
+      "settings": {
+        "title": "Réglages",
+        "description": "Réglages techniques, tous modifiables ensuite dans les options de l'intégration. Lieux, règles, tâches et événements se gèrent en conversation avec l'assistant Tempo.",
+        "data": {
+          "llm_model": "Modèle d'IA",
+          "notify_service": "Service de notification (facultatif)",
+          "home_from_zone": "Utiliser la zone domicile de Home Assistant comme domicile Tempo"
+        },
+        "data_description": {
+          "llm_model": "Modèles Gemini disponibles dans le projet Google Cloud ; le backend teste le modèle avant de l'utiliser.",
+          "notify_service": "Le service mobile_app de votre téléphone, pour les alertes de départ et les notifications.",
+          "home_from_zone": "Enregistre les coordonnées de la zone domicile comme lieu Tempo « home »."
+        }
       }
     },
     "error": {
@@ -38,7 +52,9 @@
       "invalid_auth": "Jeton invalide.",
       "rate_limited": "Trop de tentatives échouées. Patientez un moment puis réessayez.",
       "invalid_url": "URL invalide (http ou https requis).",
-      "unknown": "Erreur inattendue."
+      "unknown": "Erreur inattendue.",
+      "model_unavailable": "Ce modèle n'est pas accessible pour le projet Google Cloud ; choisissez-en un autre.",
+      "invalid_notify_service": "Service de notification inconnu (attendu : notify.xxx)."
     },
     "abort": {
       "already_configured": "Ce backend Tempo est déjà configuré.",
@@ -50,6 +66,7 @@
       "init": {
         "title": "Options de Tempo",
         "data": {
+          "llm_model": "Modèle d'IA",
           "tracker_entity_id": "Suivi de position du téléphone",
           "scan_interval": "Intervalle d'interrogation",
           "notify_service": "Service de notification (facultatif)",
@@ -58,7 +75,8 @@
         "data_description": {
           "scan_interval": "Secondes entre deux interrogations du backend (minimum 30).",
           "notify_service": "Par exemple notify.mobile_app_telephone, pour les notifications informatives et les alertes de départ.",
-          "home_from_zone": "Enregistre les coordonnées de la zone domicile comme lieu Tempo « home ». Tout le reste se gère en parlant à l'assistant Tempo."
+          "home_from_zone": "Enregistre les coordonnées de la zone domicile comme lieu Tempo « home ». Tout le reste se gère en parlant à l'assistant Tempo.",
+          "llm_model": "Modèles Gemini disponibles dans le projet Google Cloud ; le backend teste le modèle avant de l'utiliser."
         },
         "description": "Réglages techniques uniquement. Lieux, règles, tâches et événements se gèrent en conversation avec l'assistant Tempo."
       }
@@ -68,7 +86,8 @@
       "invalid_auth": "Jeton invalide.",
       "rate_limited": "Trop de tentatives échouées. Patientez un moment puis réessayez.",
       "invalid_notify_service": "Service de notification inconnu (format attendu : notify.xxx).",
-      "unknown": "Erreur inattendue."
+      "unknown": "Erreur inattendue.",
+      "model_unavailable": "Ce modèle n'est pas accessible pour le projet Google Cloud ; choisissez-en un autre."
     }
   },
   "entity": {

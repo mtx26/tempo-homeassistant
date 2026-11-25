@@ -216,6 +216,14 @@ def mock_result(aioclient_mock: AiohttpClientMocker, name: str, result: Any) -> 
     aioclient_mock.post(op(name), json={"ok": True, "result": deepcopy(result)})
 
 
+LLM_STATE: dict[str, Any] = {
+    "enabled": True,
+    "model": "gemini-3.5-flash-lite",
+    "default": "gemini-3.5-flash-lite",
+    "models": ["gemini-3.5-flash", "gemini-3.5-flash-lite"],
+}
+
+
 def mock_backend(
     aioclient_mock: AiohttpClientMocker,
     *,
@@ -251,6 +259,8 @@ def mock_backend(
     mock_result(aioclient_mock, "acknowledge_notification", {"acknowledged": "x"})
     mock_result(aioclient_mock, "update_settings", {"updated": []})
     aioclient_mock.post(f"{BASE}/v1/location", status=204)
+    aioclient_mock.get(f"{BASE}/v1/llm", json=LLM_STATE)
+    aioclient_mock.put(f"{BASE}/v1/llm", json={**LLM_STATE, "model": "gemini-3.5-flash"})
 
 
 def calls(aioclient_mock: AiohttpClientMocker, method: str, path: str) -> list[tuple[Any, ...]]:

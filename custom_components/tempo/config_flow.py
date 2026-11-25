@@ -20,6 +20,9 @@ from homeassistant.helpers.selector import (
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
     TextSelector,
     TextSelectorConfig,
     TextSelectorType,
@@ -27,6 +30,7 @@ from homeassistant.helpers.selector import (
 
 from .api import (
     TempoApiClient,
+    TempoApiError,
     TempoAuthError,
     TempoConnectionError,
     TempoError,
@@ -35,6 +39,7 @@ from .api import (
 )
 from .const import (
     CONF_HOME_FROM_ZONE,
+    CONF_LLM_MODEL,
     CONF_NOTIFY_SERVICE,
     CONF_TRACKER_ENTITY_ID,
     DEFAULT_SCAN_INTERVAL,
@@ -97,6 +102,81 @@ async def _patch_settings(client: TempoApiClient, payload: dict[str, Any]) -> di
     return {}
 
 
+def _notify_selector(hass: HomeAssistant) -> SelectSelector:
+    """Notify services known to Home Assistant (another name can still be typed)."""
+    names = sorted(f"notify.{name}" for name in hass.services.async_services_for_domain("notify"))
+    return SelectSelector(
+        SelectSelectorConfig(options=names, custom_value=True, mode=SelectSelectorMode.DROPDOWN)
+    )
+
+
+def _check_notify(hass: HomeAssistant, notify: str) -> dict[str, str]:
+    if notify and (
+        not notify.startswith("notify.")
+        or not hass.services.has_service("notify", notify.removeprefix("notify."))
+    ):
+        return {CONF_NOTIFY_SERVICE: "invalid_notify_service"}
+    return {}
+
+
+async def _llm_state(client: TempoApiClient) -> dict[str, Any]:
+    """Backend LLM state; empty when unavailable (the model field is then not shown)."""
+    try:
+        return await client.llm()
+    except TempoError as err:
+        LOGGER.warning("Could not read the Tempo LLM settings: %s", err)
+        return {}
+
+
+def _llm_fields(state: dict[str, Any]) -> dict[vol.Marker, Any]:
+    if not state.get("enabled") or not state.get("models"):
+        return {}
+    selector = SelectSelector(
+        SelectSelectorConfig(options=list(state["models"]), mode=SelectSelectorMode.DROPDOWN)
+    )
+    return {vol.Optional(CONF_LLM_MODEL): selector}
+
+
+async def _choose_model(
+    client: TempoApiClient, state: dict[str, Any], model: str | None
+) -> dict[str, str]:
+    """Send the chosen model to the backend (only when it changed)."""
+    if not model or not state.get("enabled") or model == state.get("model"):
+        return {}
+    try:
+        await client.set_llm_model(model)
+    except TempoAuthError:
+        return {"base": "invalid_auth"}
+    except TempoApiError as err:
+        LOGGER.warning("Model %s refused by the Tempo backend: %s", model, err)
+        return {CONF_LLM_MODEL: "model_unavailable"}
+    except TempoError:
+        return {"base": "cannot_connect"}
+    return {}
+
+
+async def _home_from_zone(hass: HomeAssistant, client: TempoApiClient) -> dict[str, str]:
+    """Register Home Assistant's home zone as the Tempo place ``home`` (technical setup)."""
+    config = hass.config
+    try:
+        await client.operation(
+            "upsert_place",
+            {
+                "place_id": "home",
+                "name": config.location_name or "Domicile",
+                "latitude": config.latitude,
+                "longitude": config.longitude,
+            },
+        )
+        await client.update_settings({"home_place_id": "home"})
+    except TempoAuthError:
+        return {"base": "invalid_auth"}
+    except TempoError as err:
+        LOGGER.warning("Could not register the home zone in Tempo: %s", err)
+        return {"base": "cannot_connect"}
+    return {}
+
+
 class TempoConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle the Tempo config flow."""
 
@@ -106,6 +186,15 @@ class TempoConfigFlow(ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         """Initialize the flow."""
         self._data: dict[str, Any] = {}
+        self._llm: dict[str, Any] | None = None
+
+    def _setup_client(self) -> TempoApiClient:
+        return _client(
+            self.hass,
+            self._data[CONF_URL],
+            self._data[CONF_API_TOKEN],
+            self._data[CONF_VERIFY_SSL],
+        )
 
     @staticmethod
     @callback
@@ -147,20 +236,45 @@ class TempoConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             entity_id = user_input[CONF_TRACKER_ENTITY_ID]
-            client = _client(
-                self.hass,
-                self._data[CONF_URL],
-                self._data[CONF_API_TOKEN],
-                self._data[CONF_VERIFY_SSL],
-            )
-            errors = await _push_tracker(client, entity_id)
+            errors = await _push_tracker(self._setup_client(), entity_id)
             if not errors:
-                return self.async_create_entry(
-                    title="Tempo", data={**self._data, CONF_TRACKER_ENTITY_ID: entity_id}
-                )
+                self._data[CONF_TRACKER_ENTITY_ID] = entity_id
+                return await self.async_step_settings()
         return self.async_show_form(
             step_id="tracker",
             data_schema=vol.Schema({vol.Required(CONF_TRACKER_ENTITY_ID): TRACKER_SELECTOR}),
+            errors=errors,
+        )
+
+    async def async_step_settings(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """First technical settings: AI model, notify service, home zone."""
+        client = self._setup_client()
+        if self._llm is None:
+            self._llm = await _llm_state(client)
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            notify = (user_input.get(CONF_NOTIFY_SERVICE) or "").strip()
+            errors = _check_notify(self.hass, notify)
+            if not errors:
+                errors = await _choose_model(client, self._llm, user_input.get(CONF_LLM_MODEL))
+            if not errors and user_input.get(CONF_HOME_FROM_ZONE):
+                errors = await _home_from_zone(self.hass, client)
+            if not errors:
+                options = {CONF_NOTIFY_SERVICE: notify} if notify else {}
+                return self.async_create_entry(title="Tempo", data=self._data, options=options)
+        fields: dict[vol.Marker, Any] = {
+            **_llm_fields(self._llm),
+            vol.Optional(CONF_NOTIFY_SERVICE): _notify_selector(self.hass),
+            vol.Optional(CONF_HOME_FROM_ZONE, default=True): bool,
+        }
+        suggested = {CONF_LLM_MODEL: self._llm.get("model"), CONF_HOME_FROM_ZONE: True}
+        return self.async_show_form(
+            step_id="settings",
+            data_schema=self.add_suggested_values_to_schema(
+                vol.Schema(fields), user_input or suggested
+            ),
             errors=errors,
         )
 
@@ -196,7 +310,7 @@ class TempoConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class TempoOptionsFlow(OptionsFlowWithReload):
-    """Technical options: phone tracker, polling interval, notify service.
+    """Technical options: phone tracker, polling interval, notify service, AI model.
 
     ``home_from_zone`` (one-shot) registers Home Assistant's home zone as the Tempo place
     ``home`` and makes it the home place. Everything else (places, rules, tasks, events) is
@@ -215,26 +329,6 @@ class TempoOptionsFlow(OptionsFlowWithReload):
             entry.data.get(CONF_VERIFY_SSL, True),
         )
 
-    async def _home_from_zone(self, client: TempoApiClient) -> dict[str, str]:
-        config = self.hass.config
-        try:
-            await client.operation(
-                "upsert_place",
-                {
-                    "place_id": "home",
-                    "name": config.location_name or "Domicile",
-                    "latitude": config.latitude,
-                    "longitude": config.longitude,
-                },
-            )
-            await client.update_settings({"home_place_id": "home"})
-        except TempoAuthError:
-            return {"base": "invalid_auth"}
-        except TempoError as err:
-            LOGGER.warning("Could not register the home zone in Tempo: %s", err)
-            return {"base": "cannot_connect"}
-        return {}
-
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Manage the options."""
         entry = self.config_entry
@@ -243,18 +337,17 @@ class TempoOptionsFlow(OptionsFlowWithReload):
         current_tracker = entry.options.get(
             CONF_TRACKER_ENTITY_ID, entry.data.get(CONF_TRACKER_ENTITY_ID)
         )
+        llm = await _llm_state(client)
         if user_input is not None:
             notify = (user_input.get(CONF_NOTIFY_SERVICE) or "").strip()
-            if notify and (
-                not notify.startswith("notify.")
-                or not self.hass.services.has_service("notify", notify.removeprefix("notify."))
-            ):
-                errors[CONF_NOTIFY_SERVICE] = "invalid_notify_service"
+            errors = _check_notify(self.hass, notify)
             tracker = user_input[CONF_TRACKER_ENTITY_ID]
+            if not errors:
+                errors = await _choose_model(client, llm, user_input.get(CONF_LLM_MODEL))
             if not errors and tracker != current_tracker:
                 errors = await _push_tracker(client, tracker)
             if not errors and user_input.get(CONF_HOME_FROM_ZONE):
-                errors = await self._home_from_zone(client)
+                errors = await _home_from_zone(self.hass, client)
             if not errors:
                 options: dict[str, Any] = {
                     CONF_TRACKER_ENTITY_ID: tracker,
@@ -275,10 +368,12 @@ class TempoOptionsFlow(OptionsFlowWithReload):
                     mode=NumberSelectorMode.BOX,
                 )
             ),
-            vol.Optional(CONF_NOTIFY_SERVICE): str,
+            **_llm_fields(llm),
+            vol.Optional(CONF_NOTIFY_SERVICE): _notify_selector(self.hass),
             vol.Optional(CONF_HOME_FROM_ZONE, default=False): bool,
         }
         suggested = {
+            CONF_LLM_MODEL: llm.get("model"),
             CONF_TRACKER_ENTITY_ID: current_tracker,
             CONF_SCAN_INTERVAL: entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
             CONF_NOTIFY_SERVICE: entry.options.get(CONF_NOTIFY_SERVICE, ""),

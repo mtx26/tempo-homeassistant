@@ -20,7 +20,8 @@ Licence: to be chosen by the owner.
 
 Aucun service métier, bouton, formulaire ou tableau de bord de modification : tout passe par la
 conversation. Seule la configuration technique (URL, jeton, traceur, intervalle, service de
-notification, enregistrement de la zone domicile) se fait dans les écrans d'intégration.
+notification, modèle d'IA, enregistrement de la zone domicile) se fait dans les écrans
+d'intégration.
 
 ## Compatibilité / Compatibility
 
@@ -43,10 +44,13 @@ jusqu'à 150 s la réponse du backend (budget de 60 s de l'assistant plus une re
 ## Configuration
 Paramètres → Appareils et services → *Ajouter une intégration* → **Tempo** :
 1. URL interne du backend (ex. `http://tempo-api:8000`) et jeton de service ;
-2. `device_tracker` du téléphone (source de la position réelle).
+2. `device_tracker` du téléphone (source de la position réelle) ;
+3. réglages : modèle d'IA (liste des modèles Gemini du projet Google Cloud, testé par le backend
+   avant d'être retenu ; absent si le backend n'a pas d'IA), service `notify` (liste des services
+   existants) et zone domicile.
 
-Options : traceur, intervalle d'interrogation (60 s, minimum 30 s), service `notify` facultatif,
-et *Utiliser la zone domicile de Home Assistant comme domicile Tempo* (enregistre le lieu
+Options (modifiables à tout moment) : modèle d'IA, traceur, intervalle d'interrogation (60 s,
+minimum 30 s), service `notify` facultatif, et *Utiliser la zone domicile de Home Assistant comme domicile Tempo* (enregistre le lieu
 `home` avec les coordonnées de la zone domicile).
 
 Puis, dans Assist, choisir l'agent **Tempo** et parler normalement, par exemple :

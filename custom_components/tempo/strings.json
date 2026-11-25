@@ -31,6 +31,20 @@
         "data": {
           "api_token": "Service token"
         }
+      },
+      "settings": {
+        "title": "Settings",
+        "description": "Technical settings, all editable later in the integration options. Places, rules, tasks and events are managed in conversation with the Tempo assistant.",
+        "data": {
+          "llm_model": "AI model",
+          "notify_service": "Notify service (optional)",
+          "home_from_zone": "Use the Home Assistant home zone as Tempo home"
+        },
+        "data_description": {
+          "llm_model": "Gemini models available in the Google Cloud project; the backend tests the model before using it.",
+          "notify_service": "Your phone's mobile_app service, for departure alerts and informative notifications.",
+          "home_from_zone": "Registers the home zone coordinates as the Tempo place \"home\"."
+        }
       }
     },
     "error": {
@@ -38,7 +52,9 @@
       "invalid_auth": "Invalid token.",
       "rate_limited": "Too many failed attempts. Wait a moment and try again.",
       "invalid_url": "Invalid URL (http or https required).",
-      "unknown": "Unexpected error."
+      "unknown": "Unexpected error.",
+      "model_unavailable": "This model is not accessible for the Google Cloud project; choose another one.",
+      "invalid_notify_service": "Unknown notify service (expected notify.xxx)."
     },
     "abort": {
       "already_configured": "This Tempo backend is already configured.",
@@ -50,6 +66,7 @@
       "init": {
         "title": "Tempo options",
         "data": {
+          "llm_model": "AI model",
           "tracker_entity_id": "Phone device tracker",
           "scan_interval": "Polling interval",
           "notify_service": "Notify service (optional)",
@@ -58,7 +75,8 @@
         "data_description": {
           "scan_interval": "Seconds between two polls of the backend (minimum 30).",
           "notify_service": "For example notify.mobile_app_phone, used for informative notifications and departure alerts.",
-          "home_from_zone": "Registers the home zone coordinates as the Tempo place \"home\". Everything else is managed by talking to the Tempo assistant."
+          "home_from_zone": "Registers the home zone coordinates as the Tempo place \"home\". Everything else is managed by talking to the Tempo assistant.",
+          "llm_model": "Gemini models available in the Google Cloud project; the backend tests the model before using it."
         },
         "description": "Technical settings only. Places, rules, tasks and events are managed in conversation with the Tempo assistant."
       }
@@ -68,7 +86,8 @@
       "invalid_auth": "Invalid token.",
       "rate_limited": "Too many failed attempts. Wait a moment and try again.",
       "invalid_notify_service": "Unknown notify service (expected notify.xxx).",
-      "unknown": "Unexpected error."
+      "unknown": "Unexpected error.",
+      "model_unavailable": "This model is not accessible for the Google Cloud project; choose another one."
     }
   },
   "entity": {

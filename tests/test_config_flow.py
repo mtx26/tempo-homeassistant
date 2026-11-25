@@ -13,12 +13,13 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClien
 
 from custom_components.tempo.const import (
     CONF_HOME_FROM_ZONE,
+    CONF_LLM_MODEL,
     CONF_NOTIFY_SERVICE,
     CONF_TRACKER_ENTITY_ID,
     DOMAIN,
 )
 
-from .conftest import BASE, TOKEN, TRACKER, calls, mock_backend
+from .conftest import BASE, LLM_STATE, TOKEN, TRACKER, calls, mock_backend
 
 USER_INPUT = {CONF_URL: "HTTP://Tempo-API:8000/", CONF_API_TOKEN: TOKEN, CONF_VERIFY_SSL: True}
 
@@ -44,8 +45,14 @@ async def test_full_flow(hass: HomeAssistant, aioclient_mock: AiohttpClientMocke
     result = await hass.config_entries.flow.async_configure(
         flow_id, {CONF_TRACKER_ENTITY_ID: TRACKER}
     )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "settings"
+    result = await hass.config_entries.flow.async_configure(
+        flow_id, {CONF_LLM_MODEL: "gemini-3.5-flash-lite", CONF_HOME_FROM_ZONE: False}
+    )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["title"] == "Tempo"
+    assert not calls(aioclient_mock, "PUT", "/v1/llm")  # unchanged model: nothing sent
     assert result["data"] == {
         CONF_URL: BASE,
         CONF_API_TOKEN: TOKEN,
@@ -211,4 +218,89 @@ async def test_options_home_from_zone(
     assert (place["latitude"], place["longitude"]) == (50.45, 3.95)
     settings = calls(aioclient_mock, "POST", "/v1/operations/update_settings")[-1][2]
     assert settings == {"home_place_id": "home"}
+    await hass.async_block_till_done()
+
+
+async def _to_settings(hass: HomeAssistant) -> str:
+    flow_id = await _start(hass)
+    await hass.config_entries.flow.async_configure(flow_id, USER_INPUT)
+    result = await hass.config_entries.flow.async_configure(
+        flow_id, {CONF_TRACKER_ENTITY_ID: TRACKER}
+    )
+    assert result["step_id"] == "settings"
+    return flow_id
+
+
+async def test_first_setup_chooses_model_notify_and_home(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """The first configuration sets the AI model, notify service and home zone at once."""
+    mock_backend(aioclient_mock)
+    aioclient_mock.post(f"{BASE}/v1/operations/upsert_place", json={"ok": True, "result": {}})
+    async_mock_service(hass, "notify", "mobile_app_phone")
+    flow_id = await _to_settings(hass)
+    result = await hass.config_entries.flow.async_configure(
+        flow_id,
+        {
+            CONF_LLM_MODEL: "gemini-3.5-flash",
+            CONF_NOTIFY_SERVICE: "notify.mobile_app_phone",
+            CONF_HOME_FROM_ZONE: True,
+        },
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["options"] == {CONF_NOTIFY_SERVICE: "notify.mobile_app_phone"}
+    assert calls(aioclient_mock, "PUT", "/v1/llm")[-1][2] == {"model": "gemini-3.5-flash"}
+    assert calls(aioclient_mock, "POST", "/v1/operations/upsert_place")
+
+
+async def test_inaccessible_model_is_reported_on_the_field(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    mock_backend(aioclient_mock)
+    flow_id = await _to_settings(hass)
+    aioclient_mock.clear_requests()
+    aioclient_mock.put(f"{BASE}/v1/llm", status=422, json={"detail": "modèle inaccessible"})
+    mock_backend(aioclient_mock)  # the first registered answer for a URL wins
+    result = await hass.config_entries.flow.async_configure(
+        flow_id, {CONF_LLM_MODEL: "gemini-3.5-flash", CONF_HOME_FROM_ZONE: False}
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {CONF_LLM_MODEL: "model_unavailable"}
+
+
+async def test_backend_without_llm_hides_the_model_field(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    mock_backend(aioclient_mock)
+    flow_id = await _start(hass)
+    await hass.config_entries.flow.async_configure(flow_id, USER_INPUT)
+    aioclient_mock.clear_requests()
+    aioclient_mock.get(
+        f"{BASE}/v1/llm", json={"enabled": False, "model": None, "default": "x", "models": []}
+    )
+    mock_backend(aioclient_mock)  # the first registered answer for a URL wins
+    result = await hass.config_entries.flow.async_configure(
+        flow_id, {CONF_TRACKER_ENTITY_ID: TRACKER}
+    )
+    assert CONF_LLM_MODEL not in result["data_schema"].schema
+    result = await hass.config_entries.flow.async_configure(flow_id, {CONF_HOME_FROM_ZONE: False})
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+
+
+async def test_options_change_the_model(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, init_integration: MockConfigEntry
+) -> None:
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
+    assert CONF_LLM_MODEL in result["data_schema"].schema
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            CONF_LLM_MODEL: "gemini-3.5-flash",
+            CONF_TRACKER_ENTITY_ID: TRACKER,
+            CONF_SCAN_INTERVAL: 60,
+        },
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert calls(aioclient_mock, "PUT", "/v1/llm")[-1][2] == {"model": "gemini-3.5-flash"}
+    assert LLM_STATE["model"] == "gemini-3.5-flash-lite"
     await hass.async_block_till_done()
