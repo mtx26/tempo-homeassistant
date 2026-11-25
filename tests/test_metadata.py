@@ -56,7 +56,8 @@ def test_manifest() -> None:
         assert manifest[key], key
     assert manifest["domain"] == DOMAIN
     assert re.fullmatch(r"\d+\.\d+\.\d+", manifest["version"])
-    assert manifest["version"] == "0.3.0"
+    project = re.search(r'^version = "([^"]+)"', (REPO / "pyproject.toml").read_text(), re.M)
+    assert project is not None and manifest["version"] == project.group(1)  # one version
     assert manifest["config_flow"] is True
     assert "conversation" in manifest["dependencies"]
     assert manifest["documentation"].startswith("https://")
