@@ -26,6 +26,9 @@ jobs:
       - uses: hacs/action@main
         with:
           category: integration
+          # Installed as a HACS custom repository: the default-store publishing checks
+          # (licence, repository topics) do not apply until a licence is chosen.
+          ignore: "license topics"
 
   tests:
     name: Lint, types and tests
