@@ -9,7 +9,7 @@ from urllib.parse import quote
 import aiohttp
 from yarl import URL
 
-from .const import DEFAULT_TIMEOUT_SECONDS
+from .const import CONVERSATION_TIMEOUT_SECONDS, DEFAULT_TIMEOUT_SECONDS
 
 
 class TempoError(Exception):
@@ -82,6 +82,7 @@ class TempoApiClient:
         params: dict[str, str] | None = None,
         json: Any = None,
         auth: bool = True,
+        seconds: float = DEFAULT_TIMEOUT_SECONDS,
     ) -> Any:
         headers = {"Accept": "application/json"}
         if auth:
@@ -93,7 +94,7 @@ class TempoApiClient:
                 params=params,
                 json=json,
                 headers=headers,
-                timeout=aiohttp.ClientTimeout(total=DEFAULT_TIMEOUT_SECONDS),
+                timeout=aiohttp.ClientTimeout(total=seconds),
             ) as resp:
                 if resp.status in (401, 403):
                     raise TempoAuthError("authentication rejected")
@@ -181,7 +182,12 @@ class TempoApiClient:
         payload: dict[str, Any] = {"text": text}
         if conversation_id:
             payload["conversation_id"] = conversation_id[:100]
-        return cast(dict[str, Any], await self._send("POST", "/v1/conversation", payload))
+        return cast(
+            dict[str, Any],
+            await self._request(
+                "POST", "/v1/conversation", json=payload, seconds=CONVERSATION_TIMEOUT_SECONDS
+            ),
+        )
 
     async def operation(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         """POST /v1/operations/{name}: ``{"ok": true, "result": ...}`` (422 when refused)."""

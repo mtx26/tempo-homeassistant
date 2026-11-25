@@ -112,9 +112,6 @@
       "pending_proposals": {
         "name": "Approbations en attente"
       },
-      "unread_notifications": {
-        "name": "Notifications non lues"
-      },
       "issues": {
         "name": "Problèmes de planification"
       },

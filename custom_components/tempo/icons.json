@@ -22,9 +22,6 @@
       "pending_proposals": {
         "default": "mdi:account-check"
       },
-      "unread_notifications": {
-        "default": "mdi:bell"
-      },
       "issues": {
         "default": "mdi:alert-circle-outline"
       },

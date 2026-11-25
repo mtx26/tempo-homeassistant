@@ -261,12 +261,6 @@ SENSORS: tuple[TempoSensorEntityDescription, ...] = (
         attrs_fn=_proposal_attrs,
     ),
     TempoSensorEntityDescription(
-        key="unread_notifications",
-        translation_key="unread_notifications",
-        state_class=SensorStateClass.MEASUREMENT,
-        value_fn=_int("unread_notifications"),
-    ),
-    TempoSensorEntityDescription(
         key="trainings_to_confirm",
         translation_key="trainings_to_confirm",
         state_class=SensorStateClass.MEASUREMENT,

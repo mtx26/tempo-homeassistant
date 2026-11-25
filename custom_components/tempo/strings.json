@@ -112,9 +112,6 @@
       "pending_proposals": {
         "name": "Pending approvals"
       },
-      "unread_notifications": {
-        "name": "Unread notifications"
-      },
       "issues": {
         "name": "Planning issues"
       },

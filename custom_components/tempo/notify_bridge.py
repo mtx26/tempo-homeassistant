@@ -7,8 +7,10 @@ proposal, or changing anything, is done by talking to the Tempo assistant.
   (``tempo_<id>``), is pushed to the optional notify service, and is then acknowledged in the
   backend so it is not shown twice;
 * pending proposals are pushed once to the optional notify service, with a hint to answer
-  the assistant;
-* departure alerts are raised once per (event, status).
+  the assistant.
+
+Departure alerts and reminders are ordinary backend notifications (one source, deduplicated
+there): the bridge never builds its own.
 """
 
 from __future__ import annotations
@@ -21,17 +23,10 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 
 from .api import TempoError
-from .const import CONF_NOTIFY_SERVICE, DEPARTURE_ALERT_STATUSES, DOMAIN, LOGGER
+from .const import CONF_NOTIFY_SERVICE, LOGGER
 from .coordinator import TempoConfigEntry, TempoCoordinator
 
 PROPOSAL_HINT = "Répondez à Tempo, par exemple « accepte la proposition » ou « refuse »."
-
-DEPARTURE_TEXT = {
-    "leave_now": "Partez maintenant",
-    "leave_earlier": "Partez plus tôt que prévu",
-    "at_risk": "Départ à risque",
-    "late": "Vous êtes en retard",
-}
 
 
 class TempoNotificationBridge:
@@ -46,7 +41,6 @@ class TempoNotificationBridge:
         self._coordinator = coordinator
         self._surfaced: set[str] = set()
         self._notified_proposals: set[str] = set()
-        self._departure_alerts: set[tuple[str, str]] = set()
         self._unsubs: list[Callable[[], None]] = []
 
     @property
@@ -77,10 +71,6 @@ class TempoNotificationBridge:
         for proposal in data.proposals:
             if proposal.get("status", "pending") == "pending":
                 self._notify_proposal(proposal)
-        check = (data.summary or {}).get("departure_check")
-        if isinstance(check, dict):
-            travel = (data.summary or {}).get("next_departure")
-            self._departure_alert(check, travel if isinstance(travel, dict) else None)
 
     def _surface_notification(self, notification: dict[str, Any]) -> None:
         if notification.get("acknowledged") or notification.get("id") is None:
@@ -119,32 +109,6 @@ class TempoNotificationBridge:
         self._notified_proposals.add(proposal_id)
         title = f"Tempo : {proposal.get('title') or 'modification à approuver'}"
         self._call_notify(service, title, PROPOSAL_HINT, {"tag": f"tempo_proposal_{proposal_id}"})
-
-    def _departure_alert(self, check: dict[str, Any], travel: dict[str, Any] | None) -> None:
-        status = check.get("status")
-        if status not in DEPARTURE_ALERT_STATUSES:
-            return
-        event_key = str((travel or {}).get("id") or check.get("event_title") or "")
-        key = (event_key, str(status))
-        if key in self._departure_alerts:
-            return
-        self._departure_alerts.add(key)
-        title = f"Tempo : {DEPARTURE_TEXT[str(status)]}"
-        parts = []
-        if check.get("event_title"):
-            parts.append(str(check["event_title"]))
-        if check.get("leave_at"):
-            parts.append(f"départ {check['leave_at']}")
-        if check.get("minutes_late"):
-            parts.append(f"retard estimé {check['minutes_late']} min")
-        if check.get("reason"):
-            parts.append(str(check["reason"]))
-        message = " — ".join(parts) or title
-        persistent_notification.async_create(
-            self._hass, message, title=title, notification_id=f"{DOMAIN}_departure"
-        )
-        if (service := self.notify_service) is not None:
-            self._call_notify(service, title, message, {"tag": f"{DOMAIN}_departure"})
 
     def _call_notify(self, service: str, title: str, message: str, data: dict[str, Any]) -> None:
         domain, _, name = service.partition(".")

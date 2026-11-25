@@ -51,7 +51,7 @@ async def test_sensor_states(hass: HomeAssistant, init_integration: MockConfigEn
     assert proposals is not None
     assert proposals.state == "1"
     assert proposals.attributes["proposals"][0]["id"] == "prop-1"
-    assert hass.states.get("sensor.tempo_unread_notifications").state == "1"  # type: ignore[union-attr]
+    assert hass.states.get("sensor.tempo_unread_notifications") is None
 
     issues = hass.states.get("sensor.tempo_planning_issues")
     assert issues is not None

@@ -85,7 +85,6 @@ SUMMARY: dict[str, Any] = {
     "remaining_study_minutes": 600,
     "today_study_minutes": 90,
     "pending_proposals": 1,
-    "unread_notifications": 1,
     "to_confirm": [
         {
             "id": "act-2",

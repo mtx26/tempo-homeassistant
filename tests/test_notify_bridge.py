@@ -37,24 +37,20 @@ async def test_persistent_notification_once_and_ack(
     assert len(acks) == 2
 
 
-async def test_departure_alert_once_per_status(
+async def test_departure_state_never_creates_a_second_notification(
     hass: HomeAssistant,
     aioclient_mock: AiohttpClientMocker,
     init_integration: MockConfigEntry,
 ) -> None:
-    """Departure alerts are raised once per (event, status)."""
+    """Departure alerts come from the backend notifications only (one source, no duplicate):
+    the departure state shown by the sensors never raises its own notification."""
     notifications = persistent_notification._async_get_or_create_notifications(hass)
-    assert "Partez plus tôt" in notifications["tempo_departure"]["title"]
-    persistent_notification.async_dismiss(hass, "tempo_departure")
-    await poll(hass)
-    assert "tempo_departure" not in notifications
-
     summary = deepcopy(SUMMARY)
     summary["departure_check"]["status"] = "leave_now"
     aioclient_mock.clear_requests()
     mock_backend(aioclient_mock, summary=summary)
     await poll(hass)
-    assert "Partez maintenant" in notifications["tempo_departure"]["title"]
+    assert set(notifications) == {"tempo_notif-1"}
 
 
 async def test_proposal_pushed_once_without_actions(

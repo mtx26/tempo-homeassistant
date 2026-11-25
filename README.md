@@ -14,9 +14,9 @@ Licence: to be chosen by the owner.
 | Agent de conversation **Tempo** (Assist, texte ou voix) | **Unique interface de gestion** : créer, déplacer, annuler, verrouiller, déclarer le travail fait, accepter/refuser une proposition, régler lieux, disponibilités et rappels… Le texte part vers `POST /v1/conversation` avec l'identifiant de conversation Assist (les références « déplace-le » gardent leur contexte) ; la réponse prononcée est celle du backend, jamais inventée. |
 | Calendrier `calendar.tempo` | Lecture seule : cours, événements, entraînements, compétitions, séances d'étude, trajets. |
 | Liste `todo.tempo_tasks` | Lecture seule : travail restant (tâches et volumes d'étude). |
-| Capteurs | Prochain événement, prochain départ, état du départ, étude du jour, travail restant, état du plan, points à vérifier, propositions en attente, notifications non lues, entraînements à confirmer. |
+| Capteurs | Prochain événement, prochain départ, état du départ, étude du jour, travail restant, état du plan, points à vérifier, propositions en attente, entraînements à confirmer. |
 | Position | Pousse la position GPS réelle du `device_tracker` configuré (throttling 60 s / 100 m). |
-| Notifications | Notifications persistantes + service `notify` facultatif ; **informatives uniquement** (aucun bouton d'action) : on répond à Tempo en langage naturel. |
+| Notifications | Chaque notification du backend (alertes et rappels de départ compris) devient une notification persistante, relayée au service `notify` facultatif, puis est acquittée côté backend (remise une seule fois). **Informatives uniquement** (aucun bouton d'action) : on répond à Tempo en langage naturel. |
 
 Aucun service métier, bouton, formulaire ou tableau de bord de modification : tout passe par la
 conversation. Seule la configuration technique (URL, jeton, traceur, intervalle, service de
@@ -27,11 +27,12 @@ notification, enregistrement de la zone domicile) se fait dans les écrans d'int
 | Home Assistant | Python | Résultat / Result |
 | --- | --- | --- |
 | 2026.2.3 | 3.13 | suite de tests complète OK (+ mypy strict, Ruff) |
+| 2026.11.2 (conteneur local) | — | recette réelle avec le backend de développement (`scripts/ha_e2e.py` du dépôt backend) |
 
-`hacs.json` déclare le minimum `2026.2.0`. Tests automatisés avec backend simulé, plus un test
-de contrat dans le dépôt backend (vrai client de cette intégration contre le vrai backend et
-PostgreSQL). **Pas encore d'essai sur une instance Home Assistant réelle ni d'installation HACS
-réelle** (le dépôt n'est pas publié).
+`hacs.json` déclare le minimum `2026.2.0`. Les tests automatisés simulent le backend ; un test
+de contrat du dépôt backend exécute le vrai client de cette intégration contre le vrai backend.
+**Installation HACS réelle non testée** (le dépôt n'est pas publié). La conversation attend
+jusqu'à 150 s la réponse du backend (budget de 60 s de l'assistant plus une replanification).
 
 ## Installation
 - **HACS (une fois le dépôt publié)** : HACS → ⋮ → *Dépôts personnalisés* →
