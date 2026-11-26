@@ -13,7 +13,6 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClien
 
 from custom_components.tempo.const import (
     CONF_CALENDAR_BASE_URL,
-    CONF_HOME_FROM_ZONE,
     CONF_LLM_MODEL,
     CONF_NOTIFY_SERVICE,
     CONF_TRACKER_ENTITY_ID,
@@ -49,7 +48,7 @@ async def test_full_flow(hass: HomeAssistant, aioclient_mock: AiohttpClientMocke
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "settings"
     result = await hass.config_entries.flow.async_configure(
-        flow_id, {CONF_LLM_MODEL: "gemini-3.5-flash-lite", CONF_HOME_FROM_ZONE: False}
+        flow_id, {CONF_LLM_MODEL: "gemini-3.5-flash-lite"}
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["title"] == "Tempo"
@@ -197,31 +196,6 @@ async def test_options_flow(
     assert coordinator.update_interval.total_seconds() == 120
 
 
-async def test_options_home_from_zone(
-    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, init_integration: MockConfigEntry
-) -> None:
-    """The HA home zone is registered as the Tempo place "home" (technical setup only)."""
-    hass.config.latitude, hass.config.longitude = 50.45, 3.95
-    aioclient_mock.post(f"{BASE}/v1/operations/upsert_place", json={"ok": True})
-    aioclient_mock.post(f"{BASE}/v1/operations/update_settings", json={"ok": True})
-    result = await hass.config_entries.options.async_init(init_integration.entry_id)
-    result = await hass.config_entries.options.async_configure(
-        result["flow_id"],
-        {
-            CONF_TRACKER_ENTITY_ID: TRACKER,
-            CONF_SCAN_INTERVAL: 60,
-            CONF_HOME_FROM_ZONE: True,
-        },
-    )
-    assert result["type"] is FlowResultType.CREATE_ENTRY
-    place = calls(aioclient_mock, "POST", "/v1/operations/upsert_place")[-1][2]
-    assert place["place_id"] == "home"
-    assert (place["latitude"], place["longitude"]) == (50.45, 3.95)
-    settings = calls(aioclient_mock, "POST", "/v1/operations/update_settings")[-1][2]
-    assert settings == {"home_place_id": "home"}
-    await hass.async_block_till_done()
-
-
 async def _to_settings(hass: HomeAssistant) -> str:
     flow_id = await _start(hass)
     await hass.config_entries.flow.async_configure(flow_id, USER_INPUT)
@@ -235,7 +209,7 @@ async def _to_settings(hass: HomeAssistant) -> str:
 async def test_first_setup_chooses_model_notify_and_home(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ) -> None:
-    """The first configuration sets the AI model, notify service and home zone at once."""
+    """The first configuration sets the AI model and notify service at once."""
     mock_backend(aioclient_mock)
     aioclient_mock.post(f"{BASE}/v1/operations/upsert_place", json={"ok": True, "result": {}})
     async_mock_service(hass, "notify", "mobile_app_phone")
@@ -245,13 +219,11 @@ async def test_first_setup_chooses_model_notify_and_home(
         {
             CONF_LLM_MODEL: "gemini-3.5-flash",
             CONF_NOTIFY_SERVICE: "notify.mobile_app_phone",
-            CONF_HOME_FROM_ZONE: True,
         },
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["options"] == {CONF_NOTIFY_SERVICE: "notify.mobile_app_phone"}
     assert calls(aioclient_mock, "PUT", "/v1/llm")[-1][2] == {"model": "gemini-3.5-flash"}
-    assert calls(aioclient_mock, "POST", "/v1/operations/upsert_place")
 
 
 async def test_inaccessible_model_is_reported_on_the_field(
@@ -263,7 +235,7 @@ async def test_inaccessible_model_is_reported_on_the_field(
     aioclient_mock.put(f"{BASE}/v1/llm", status=422, json={"detail": "modèle inaccessible"})
     mock_backend(aioclient_mock)  # the first registered answer for a URL wins
     result = await hass.config_entries.flow.async_configure(
-        flow_id, {CONF_LLM_MODEL: "gemini-3.5-flash", CONF_HOME_FROM_ZONE: False}
+        flow_id, {CONF_LLM_MODEL: "gemini-3.5-flash"}
     )
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {CONF_LLM_MODEL: "model_unavailable"}
@@ -284,7 +256,7 @@ async def test_backend_without_llm_hides_the_model_field(
         flow_id, {CONF_TRACKER_ENTITY_ID: TRACKER}
     )
     assert CONF_LLM_MODEL not in result["data_schema"].schema
-    result = await hass.config_entries.flow.async_configure(flow_id, {CONF_HOME_FROM_ZONE: False})
+    result = await hass.config_entries.flow.async_configure(flow_id, {})
     assert result["type"] is FlowResultType.CREATE_ENTRY
 
 

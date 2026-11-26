@@ -39,7 +39,6 @@ from .api import (
 )
 from .const import (
     CONF_CALENDAR_BASE_URL,
-    CONF_HOME_FROM_ZONE,
     CONF_LLM_MODEL,
     CONF_NOTIFY_SERVICE,
     CONF_TRACKER_ENTITY_ID,
@@ -156,28 +155,6 @@ async def _choose_model(
     return {}
 
 
-async def _home_from_zone(hass: HomeAssistant, client: TempoApiClient) -> dict[str, str]:
-    """Register Home Assistant's home zone as the Tempo place ``home`` (technical setup)."""
-    config = hass.config
-    try:
-        await client.operation(
-            "upsert_place",
-            {
-                "place_id": "home",
-                "name": config.location_name or "Domicile",
-                "latitude": config.latitude,
-                "longitude": config.longitude,
-            },
-        )
-        await client.update_settings({"home_place_id": "home"})
-    except TempoAuthError:
-        return {"base": "invalid_auth"}
-    except TempoError as err:
-        LOGGER.warning("Could not register the home zone in Tempo: %s", err)
-        return {"base": "cannot_connect"}
-    return {}
-
-
 class TempoConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle the Tempo config flow."""
 
@@ -250,7 +227,7 @@ class TempoConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_settings(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """First technical settings: AI model, notify service, home zone."""
+        """First technical settings: AI model, notify service."""
         client = self._setup_client()
         if self._llm is None:
             self._llm = await _llm_state(client)
@@ -260,17 +237,14 @@ class TempoConfigFlow(ConfigFlow, domain=DOMAIN):
             errors = _check_notify(self.hass, notify)
             if not errors:
                 errors = await _choose_model(client, self._llm, user_input.get(CONF_LLM_MODEL))
-            if not errors and user_input.get(CONF_HOME_FROM_ZONE):
-                errors = await _home_from_zone(self.hass, client)
             if not errors:
                 options = {CONF_NOTIFY_SERVICE: notify} if notify else {}
                 return self.async_create_entry(title="Tempo", data=self._data, options=options)
         fields: dict[vol.Marker, Any] = {
             **_llm_fields(self._llm),
             vol.Optional(CONF_NOTIFY_SERVICE): _notify_selector(self.hass),
-            vol.Optional(CONF_HOME_FROM_ZONE, default=True): bool,
         }
-        suggested = {CONF_LLM_MODEL: self._llm.get("model"), CONF_HOME_FROM_ZONE: True}
+        suggested = {CONF_LLM_MODEL: self._llm.get("model")}
         return self.async_show_form(
             step_id="settings",
             data_schema=self.add_suggested_values_to_schema(
@@ -326,11 +300,9 @@ def _calendar_url(base: str, path: str | None) -> str:
 
 
 class TempoOptionsFlow(OptionsFlowWithReload):
-    """Technical options: phone tracker, polling interval, notify service, AI model.
-
-    ``home_from_zone`` (one-shot) registers Home Assistant's home zone as the Tempo place
-    ``home`` and makes it the home place. Everything else (places, rules, tasks, events) is
-    managed by conversation with the Tempo assistant.
+    """Technical options: phone tracker, polling interval, notify service, AI model, public
+    calendar address. Everything else (places, residences, rules, tasks, events) is managed by
+    conversation with the Tempo assistant.
     """
 
     def _client(self) -> TempoApiClient:
@@ -363,8 +335,6 @@ class TempoOptionsFlow(OptionsFlowWithReload):
                 errors = await _choose_model(client, llm, user_input.get(CONF_LLM_MODEL))
             if not errors and tracker != current_tracker:
                 errors = await _push_tracker(client, tracker)
-            if not errors and user_input.get(CONF_HOME_FROM_ZONE):
-                errors = await _home_from_zone(self.hass, client)
             if not errors:
                 options: dict[str, Any] = {
                     CONF_TRACKER_ENTITY_ID: tracker,
@@ -390,7 +360,6 @@ class TempoOptionsFlow(OptionsFlowWithReload):
             ),
             **_llm_fields(llm),
             vol.Optional(CONF_NOTIFY_SERVICE): _notify_selector(self.hass),
-            vol.Optional(CONF_HOME_FROM_ZONE, default=False): bool,
             vol.Optional(CONF_CALENDAR_BASE_URL): TextSelector(
                 TextSelectorConfig(type=TextSelectorType.URL)
             ),
@@ -401,7 +370,6 @@ class TempoOptionsFlow(OptionsFlowWithReload):
             CONF_TRACKER_ENTITY_ID: current_tracker,
             CONF_SCAN_INTERVAL: entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
             CONF_NOTIFY_SERVICE: entry.options.get(CONF_NOTIFY_SERVICE, ""),
-            CONF_HOME_FROM_ZONE: False,
             CONF_CALENDAR_BASE_URL: base,
         }
         return self.async_show_form(

@@ -37,13 +37,11 @@
         "description": "Réglages techniques, tous modifiables ensuite dans les options de l'intégration. Lieux, règles, tâches et événements se gèrent en conversation avec l'assistant Tempo.",
         "data": {
           "llm_model": "Modèle d'IA",
-          "notify_service": "Service de notification (facultatif)",
-          "home_from_zone": "Utiliser la zone domicile de Home Assistant comme domicile Tempo"
+          "notify_service": "Service de notification (facultatif)"
         },
         "data_description": {
           "llm_model": "Modèles Gemini disponibles dans le projet Google Cloud ; le backend teste le modèle avant de l'utiliser.",
-          "notify_service": "Le service mobile_app de votre téléphone, pour les alertes de départ et les notifications.",
-          "home_from_zone": "Enregistre les coordonnées de la zone domicile comme lieu Tempo « home »."
+          "notify_service": "Le service mobile_app de votre téléphone, pour les alertes de départ et les notifications."
         }
       }
     },
@@ -70,13 +68,11 @@
           "tracker_entity_id": "Suivi de position du téléphone",
           "scan_interval": "Intervalle d'interrogation",
           "notify_service": "Service de notification (facultatif)",
-          "home_from_zone": "Utiliser la zone domicile de Home Assistant comme domicile Tempo",
           "calendar_base_url": "Adresse publique de l'agenda (facultatif)"
         },
         "data_description": {
           "scan_interval": "Secondes entre deux interrogations du backend (minimum 30).",
           "notify_service": "Par exemple notify.mobile_app_telephone, pour les notifications informatives et les alertes de départ.",
-          "home_from_zone": "Enregistre les coordonnées de la zone domicile comme lieu Tempo « home ». Tout le reste se gère en parlant à l'assistant Tempo.",
           "llm_model": "Modèles Gemini disponibles dans le projet Google Cloud ; le backend teste le modèle avant de l'utiliser.",
           "calendar_base_url": "Par exemple https://tempo.exemple.com (l'hôte Cloudflare qui publie /calendar/)."
         },

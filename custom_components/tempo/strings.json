@@ -37,13 +37,11 @@
         "description": "Technical settings, all editable later in the integration options. Places, rules, tasks and events are managed in conversation with the Tempo assistant.",
         "data": {
           "llm_model": "AI model",
-          "notify_service": "Notify service (optional)",
-          "home_from_zone": "Use the Home Assistant home zone as Tempo home"
+          "notify_service": "Notify service (optional)"
         },
         "data_description": {
           "llm_model": "Gemini models available in the Google Cloud project; the backend tests the model before using it.",
-          "notify_service": "Your phone's mobile_app service, for departure alerts and informative notifications.",
-          "home_from_zone": "Registers the home zone coordinates as the Tempo place \"home\"."
+          "notify_service": "Your phone's mobile_app service, for departure alerts and informative notifications."
         }
       }
     },
@@ -70,13 +68,11 @@
           "tracker_entity_id": "Phone device tracker",
           "scan_interval": "Polling interval",
           "notify_service": "Notify service (optional)",
-          "home_from_zone": "Use the Home Assistant home zone as Tempo home",
           "calendar_base_url": "Public calendar address (optional)"
         },
         "data_description": {
           "scan_interval": "Seconds between two polls of the backend (minimum 30).",
           "notify_service": "For example notify.mobile_app_phone, used for informative notifications and departure alerts.",
-          "home_from_zone": "Registers the home zone coordinates as the Tempo place \"home\". Everything else is managed by talking to the Tempo assistant.",
           "llm_model": "Gemini models available in the Google Cloud project; the backend tests the model before using it.",
           "calendar_base_url": "For example https://tempo.example.com (the Cloudflare host that publishes /calendar/)."
         },

@@ -185,7 +185,7 @@ NOTIFICATIONS: list[dict[str, Any]] = [
 ]
 
 SETTINGS: dict[str, Any] = {
-    "home_place_id": "home",
+    "residences": ["home"],
     "tracker_entity_id": TRACKER,
     "horizon_days": 14,
     "buffer_minutes": 10,

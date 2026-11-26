@@ -20,7 +20,7 @@ Licence: to be chosen by the owner.
 
 Aucun service métier, bouton, formulaire ou tableau de bord de modification : tout passe par la
 conversation. Seule la configuration technique (URL, jeton, traceur, intervalle, service de
-notification, modèle d'IA, enregistrement de la zone domicile) se fait dans les écrans
+notification, modèle d'IA, adresse publique de l'agenda) se fait dans les écrans
 d'intégration.
 
 ## Compatibilité / Compatibility
@@ -47,11 +47,11 @@ Paramètres → Appareils et services → *Ajouter une intégration* → **Tempo
 2. `device_tracker` du téléphone (source de la position réelle) ;
 3. réglages : modèle d'IA (liste des modèles Gemini du projet Google Cloud, testé par le backend
    avant d'être retenu ; absent si le backend n'a pas d'IA), service `notify` (liste des services
-   existants) et zone domicile.
+   existants).
 
 Options (modifiables à tout moment) : modèle d'IA, traceur, intervalle d'interrogation (60 s,
-minimum 30 s), service `notify` facultatif, et *Utiliser la zone domicile de Home Assistant comme domicile Tempo* (enregistre le lieu
-`home` avec les coordonnées de la zone domicile).
+minimum 30 s), service `notify` facultatif et adresse publique de l'agenda (l'URL d'abonnement
+du téléphone s'affiche alors en haut du formulaire). Les résidences se disent à l'assistant.
 
 Puis, dans Assist, choisir l'agent **Tempo** et parler normalement, par exemple :
 « Prévois 15 heures de physique avant vendredi », « Dentiste jeudi à 14 h au centre-ville »,

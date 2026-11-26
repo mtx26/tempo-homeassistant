@@ -156,19 +156,19 @@ def _place_name(data: TempoData, place_id: Any) -> str | None:
     return None
 
 
-def _home_value(data: TempoData) -> str | None:
-    home = (data.settings or {}).get("home_place_id")
-    if not home:
+def _residences_value(data: TempoData) -> str | None:
+    residences = (data.settings or {}).get("residences") or []
+    if not residences:
         return None
-    return (_place_name(data, home) or str(home))[:255]
+    return " / ".join(_place_name(data, r) or str(r) for r in residences)[:255]
 
 
 def _settings_attrs(data: TempoData) -> dict[str, Any]:
     settings = data.settings or {}
-    home = settings.get("home_place_id")
     return {
-        "home_place_id": home,
-        "home_place_name": _place_name(data, home),
+        "residences": [
+            {"id": r, "name": _place_name(data, r)} for r in settings.get("residences") or []
+        ],
         "horizon_days": settings.get("horizon_days"),
         "buffer_minutes": settings.get("buffer_minutes"),
         "stays": [
@@ -278,7 +278,7 @@ SENSORS: tuple[TempoSensorEntityDescription, ...] = (
         key="settings",
         translation_key="settings",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=_home_value,
+        value_fn=_residences_value,
         attrs_fn=_settings_attrs,
     ),
 )
