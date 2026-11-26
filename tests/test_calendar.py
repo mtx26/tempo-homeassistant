@@ -107,6 +107,10 @@ def test_item_mapping_helpers() -> None:
     ), "naive timestamps are rejected"
     text = describe_item({"type": "travel", "status": "impossible", "fixed": False})
     assert "trajet impossible" in text
+    stale = describe_item({"type": "travel", "status": "stale", "fixed": False})
+    assert "non revalidé" in stale
+    pending = describe_item({"type": "training", "pending_move": True, "fixed": False})
+    assert "en attente de votre accord" in pending
     event = item_to_event(SCHEDULE[0])
     assert event is not None
     assert event.uid == "travel-1"

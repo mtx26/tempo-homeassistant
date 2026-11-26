@@ -70,6 +70,8 @@ def describe_item(item: dict[str, Any]) -> str:
     lines.append("Horaire fixe" if item.get("fixed") else "Déplaçable par Tempo")
     if item.get("locked"):
         lines.append("Verrouillé")
+    if item.get("pending_move"):
+        lines.append("Déplacement proposé : en attente de votre accord")
     if kind == "study" and item.get("state"):
         state = str(item["state"])
         lines.append(f"État : {STUDY_STATE_LABELS.get(state, state)}")
@@ -79,6 +81,8 @@ def describe_item(item: dict[str, Any]) -> str:
         lines.append(f"Statut du trajet : {item.get('status') or 'unknown'}")
         if item.get("status") == "impossible":
             lines.append("Aucun itinéraire trouvé : trajet impossible")
+        elif item.get("status") == "stale":
+            lines.append("Itinéraire précédent conservé, non revalidé (routage indisponible)")
         legs = item.get("legs") or []
         if legs:
             lines.append("Étapes :")

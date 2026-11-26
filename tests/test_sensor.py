@@ -46,6 +46,9 @@ async def test_sensor_states(hass: HomeAssistant, init_integration: MockConfigEn
     assert plan.state == "partial"
     assert plan.attributes["unplanned_minutes"] == 30
     assert plan.attributes["missed_blocks"] == 2
+    assert plan.attributes["questions"] == ["Où a lieu « TP » ?"]
+    assert plan.attributes["pending_approval"][0]["title"] == "Footing"
+    assert plan.attributes["unconfirmed_journeys"] == 1
 
     proposals = hass.states.get("sensor.tempo_pending_approvals")
     assert proposals is not None
@@ -78,6 +81,15 @@ async def test_sensor_empty_summary(
     assert hass.states.get("sensor.tempo_departure_status").state == "none"  # type: ignore[union-attr]
     assert hass.states.get("sensor.tempo_plan_status").state == "none"  # type: ignore[union-attr]
     assert hass.states.get("sensor.tempo_planning_issues").state == "0"  # type: ignore[union-attr]
+
+
+async def test_plan_waiting_for_approval_is_its_own_state(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, mock_config_entry: MockConfigEntry
+) -> None:
+    """A plan whose only open point is a proposed move is not shown as complete."""
+    mock_backend(aioclient_mock, summary={**SUMMARY, "plan_status": "pending_approval"})
+    await setup_entry(hass, mock_config_entry)
+    assert hass.states.get("sensor.tempo_plan_status").state == "pending_approval"  # type: ignore[union-attr]
 
 
 async def test_departure_falls_back_to_travel(

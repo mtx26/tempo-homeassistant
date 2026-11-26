@@ -45,4 +45,11 @@ DEPARTURE_STATUSES: Final = [
     "unknown_routing",
     "none",
 ]
-PLAN_STATUSES: Final = ["complete", "partial", "no_solution", "invalid", "none"]
+PLAN_STATUSES: Final = [
+    "complete",
+    "partial",
+    "pending_approval",
+    "no_solution",
+    "invalid",
+    "none",
+]

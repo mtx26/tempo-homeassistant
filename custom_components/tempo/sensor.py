@@ -107,7 +107,15 @@ def _departure_status_attrs(data: TempoData) -> dict[str, Any]:
     check = _departure_check(data) or {}
     return {
         key: check.get(key)
-        for key in ("leave_at", "minutes_late", "reason", "warnings", "checked_at", "event_title")
+        for key in (
+            "leave_at",
+            "minutes_late",
+            "reason",
+            "warnings",
+            "checked_at",
+            "event_title",
+            "event_start",
+        )
     }
 
 
@@ -123,6 +131,9 @@ def _plan_attrs(data: TempoData) -> dict[str, Any]:
         "unplanned_minutes": summary.get("unplanned_minutes"),
         "missed_blocks": summary.get("missed_blocks", 0),
         "warnings": list(summary.get("warnings") or []),
+        "questions": list(summary.get("questions") or []),
+        "pending_approval": list(summary.get("pending_approval") or []),
+        "unconfirmed_journeys": summary.get("unconfirmed_journeys", 0),
     }
 
 

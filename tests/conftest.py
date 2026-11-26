@@ -31,6 +31,9 @@ SUMMARY: dict[str, Any] = {
     "warnings": ["Realtime data unavailable for STIB"],
     "unplanned_minutes": 30,
     "missed_blocks": 2,
+    "questions": ["Où a lieu « TP » ?"],
+    "pending_approval": [{"ref": "activity:a", "title": "Footing", "from": "x", "to": "y"}],
+    "unconfirmed_journeys": 1,
     "next_event": {
         "type": "class",
         "id": "class-1",

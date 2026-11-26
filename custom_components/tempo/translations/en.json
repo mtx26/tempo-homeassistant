@@ -121,6 +121,7 @@
         "state": {
           "complete": "Complete",
           "partial": "Partial",
+          "pending_approval": "Pending approval",
           "no_solution": "No solution",
           "invalid": "Invalid",
           "none": "None"
