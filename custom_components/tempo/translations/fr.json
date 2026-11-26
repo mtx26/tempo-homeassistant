@@ -74,7 +74,7 @@
           "scan_interval": "Secondes entre deux interrogations du backend (minimum 30).",
           "notify_service": "Par exemple notify.mobile_app_telephone, pour les notifications informatives et les alertes de départ.",
           "llm_model": "Modèles Gemini disponibles dans le projet Google Cloud ; le backend teste le modèle avant de l'utiliser.",
-          "calendar_base_url": "Par exemple https://tempo.exemple.com (l'hôte Cloudflare qui publie /calendar/)."
+          "calendar_base_url": "L'adresse https de l'hôte Cloudflare qui publie /calendar/, sans chemin."
         },
         "description": "Réglages techniques uniquement. Lieux, règles, tâches et événements se gèrent en conversation avec l'assistant Tempo.\n\nURL d'abonnement de l'agenda du téléphone (à garder secrète) : {calendar_url}"
       }

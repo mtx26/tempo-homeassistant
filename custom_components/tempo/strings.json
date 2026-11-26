@@ -74,7 +74,7 @@
           "scan_interval": "Seconds between two polls of the backend (minimum 30).",
           "notify_service": "For example notify.mobile_app_phone, used for informative notifications and departure alerts.",
           "llm_model": "Gemini models available in the Google Cloud project; the backend tests the model before using it.",
-          "calendar_base_url": "For example https://tempo.example.com (the Cloudflare host that publishes /calendar/)."
+          "calendar_base_url": "The https address of the Cloudflare host that publishes /calendar/, without a path."
         },
         "description": "Technical settings only. Places, rules, tasks and events are managed in conversation with the Tempo assistant.\n\nPhone calendar subscription URL (keep it secret): {calendar_url}"
       }
