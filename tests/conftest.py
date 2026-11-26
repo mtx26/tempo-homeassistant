@@ -237,7 +237,12 @@ def mock_backend(
 ) -> None:
     """Register the read operations plus the technical writes."""
     aioclient_mock.get(
-        f"{BASE}/v1/status", json={"version": "0.6.0", "timezone": "Europe/Brussels"}
+        f"{BASE}/v1/status",
+        json={
+            "version": "0.6.0",
+            "timezone": "Europe/Brussels",
+            "calendar_path": "/calendar/feed-secret.ics",
+        },
     )
     mock_result(aioclient_mock, "get_summary", summary or SUMMARY)
     mock_result(

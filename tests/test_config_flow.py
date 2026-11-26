@@ -12,6 +12,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry, async_
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.tempo.const import (
+    CONF_CALENDAR_BASE_URL,
     CONF_HOME_FROM_ZONE,
     CONF_LLM_MODEL,
     CONF_NOTIFY_SERVICE,
@@ -304,3 +305,28 @@ async def test_options_change_the_model(
     assert calls(aioclient_mock, "PUT", "/v1/llm")[-1][2] == {"model": "gemini-3.5-flash"}
     assert LLM_STATE["model"] == "gemini-3.5-flash-lite"
     await hass.async_block_till_done()
+
+
+async def test_options_show_the_phone_calendar_url(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    """The subscription URL is shown in the options form, never as an entity."""
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
+    assert result["description_placeholders"]["calendar_url"] == (
+        "<public address>/calendar/feed-secret.ics"
+    )
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            CONF_TRACKER_ENTITY_ID: TRACKER,
+            CONF_SCAN_INTERVAL: 60,
+            CONF_CALENDAR_BASE_URL: "https://tempo.example.com/",
+        },
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    await hass.async_block_till_done()
+    assert init_integration.options[CONF_CALENDAR_BASE_URL] == "https://tempo.example.com"
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
+    assert result["description_placeholders"]["calendar_url"] == (
+        "https://tempo.example.com/calendar/feed-secret.ics"
+    )

@@ -12,6 +12,7 @@ LOGGER = logging.getLogger(__package__)
 CONF_TRACKER_ENTITY_ID: Final = "tracker_entity_id"
 CONF_NOTIFY_SERVICE: Final = "notify_service"
 CONF_HOME_FROM_ZONE: Final = "home_from_zone"
+CONF_CALENDAR_BASE_URL: Final = "calendar_base_url"
 CONF_LLM_MODEL: Final = "llm_model"
 """Not stored in the entry: the backend holds the choice (GET/PUT /v1/llm)."""
 

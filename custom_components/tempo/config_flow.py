@@ -38,6 +38,7 @@ from .api import (
     normalize_url,
 )
 from .const import (
+    CONF_CALENDAR_BASE_URL,
     CONF_HOME_FROM_ZONE,
     CONF_LLM_MODEL,
     CONF_NOTIFY_SERVICE,
@@ -309,6 +310,21 @@ class TempoConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
 
+async def _calendar_path(client: TempoApiClient) -> str | None:
+    """Path of the read-only phone calendar feed (None: feed not configured or unreachable)."""
+    try:
+        return (await client.status()).get("calendar_path")
+    except TempoError:
+        return None
+
+
+def _calendar_url(base: str, path: str | None) -> str:
+    """Subscription URL shown in the options (never stored as an entity: it is a secret)."""
+    if path is None:
+        return "-"
+    return f"{base}{path}" if base else f"<public address>{path}"
+
+
 class TempoOptionsFlow(OptionsFlowWithReload):
     """Technical options: phone tracker, polling interval, notify service, AI model.
 
@@ -338,6 +354,7 @@ class TempoOptionsFlow(OptionsFlowWithReload):
             CONF_TRACKER_ENTITY_ID, entry.data.get(CONF_TRACKER_ENTITY_ID)
         )
         llm = await _llm_state(client)
+        calendar_path = await _calendar_path(client)
         if user_input is not None:
             notify = (user_input.get(CONF_NOTIFY_SERVICE) or "").strip()
             errors = _check_notify(self.hass, notify)
@@ -355,6 +372,9 @@ class TempoOptionsFlow(OptionsFlowWithReload):
                 }
                 if notify:
                     options[CONF_NOTIFY_SERVICE] = notify
+                base = (user_input.get(CONF_CALENDAR_BASE_URL) or "").strip().rstrip("/")
+                if base:
+                    options[CONF_CALENDAR_BASE_URL] = base
                 return self.async_create_entry(data=options)
 
         fields: dict[vol.Marker, Any] = {
@@ -371,16 +391,22 @@ class TempoOptionsFlow(OptionsFlowWithReload):
             **_llm_fields(llm),
             vol.Optional(CONF_NOTIFY_SERVICE): _notify_selector(self.hass),
             vol.Optional(CONF_HOME_FROM_ZONE, default=False): bool,
+            vol.Optional(CONF_CALENDAR_BASE_URL): TextSelector(
+                TextSelectorConfig(type=TextSelectorType.URL)
+            ),
         }
+        base = entry.options.get(CONF_CALENDAR_BASE_URL, "")
         suggested = {
             CONF_LLM_MODEL: llm.get("model"),
             CONF_TRACKER_ENTITY_ID: current_tracker,
             CONF_SCAN_INTERVAL: entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
             CONF_NOTIFY_SERVICE: entry.options.get(CONF_NOTIFY_SERVICE, ""),
             CONF_HOME_FROM_ZONE: False,
+            CONF_CALENDAR_BASE_URL: base,
         }
         return self.async_show_form(
             step_id="init",
+            description_placeholders={"calendar_url": _calendar_url(base, calendar_path)},
             data_schema=self.add_suggested_values_to_schema(
                 vol.Schema(fields), user_input or suggested
             ),
