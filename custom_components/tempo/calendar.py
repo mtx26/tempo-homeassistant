@@ -55,10 +55,9 @@ def describe_legs(legs: list[dict[str, Any]]) -> list[str]:
         mode = str(leg.get("mode") or "?")
         line = f" {leg['line']}" if leg.get("line") else ""
         agency = f" ({leg['agency']})" if leg.get("agency") else ""
-        realtime = " [temps réel]" if leg.get("realtime") else ""
         lines.append(
             f"{_hhmm(leg.get('start'))}-{_hhmm(leg.get('end'))} {mode}{line}{agency}: "
-            f"{leg.get('from') or '?'} → {leg.get('to') or '?'}{realtime}"
+            f"{leg.get('from') or '?'} → {leg.get('to') or '?'}"
         )
     return lines
 
@@ -77,12 +76,16 @@ def describe_item(item: dict[str, Any]) -> str:
         lines.append(f"État : {STUDY_STATE_LABELS.get(state, state)}")
     if item.get("location"):
         lines.append(f"Lieu : {item['location']}")
-    if kind == "travel":
+    if kind == "travel" and (published := item.get("travel_details")):
+        lines.append(str(published))
+    elif kind == "travel":
         lines.append(f"Statut du trajet : {item.get('status') or 'unknown'}")
         if item.get("status") == "impossible":
             lines.append("Aucun itinéraire trouvé : trajet impossible")
         elif item.get("status") == "stale":
             lines.append("Itinéraire précédent conservé, non revalidé (routage indisponible)")
+        if item.get("stale_snapshot"):
+            lines.append("Horaires et quais à vérifier (prévisions du planning périmées).")
         legs = item.get("legs") or []
         if legs:
             lines.append("Étapes :")

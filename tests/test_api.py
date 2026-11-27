@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
+from aiohttp import ServerDisconnectedError
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
@@ -48,3 +51,38 @@ async def test_errors(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) 
     assert err.value.status == 422
     with pytest.raises(TempoConnectionError):
         await client.tasks()
+
+
+async def test_conversation_retry_reuses_the_same_logical_key(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    session = async_get_clientsession(hass)
+    original = session._request
+    sent = []
+
+    async def disconnect_once(*args: Any, **kwargs: Any) -> Any:
+        sent.append(kwargs)
+        if len(sent) == 1:
+            raise ServerDisconnectedError()
+        return await original(*args, **kwargs)
+
+    monkeypatch.setattr(session, "_request", disconnect_once)
+    client = TempoApiClient(session, BASE, TOKEN)
+    url = f"{BASE}/v1/conversation"
+    aioclient_mock.post(url, json={"reply": "Confirmé"})
+    assert await client.conversation("confirme 881faeef", "assist", user_id="student") == {
+        "reply": "Confirmé",
+    }
+    first, retry = sent
+    assert first["headers"]["Idempotency-Key"] == retry["headers"]["Idempotency-Key"]
+    assert (
+        first["json"]
+        == retry["json"]
+        == {
+            "text": "confirme 881faeef",
+            "conversation_id": "assist",
+            "user_id": "student",
+        }
+    )
+    await client.conversation("confirme 881faeef", "assist", user_id="student")
+    assert sent[-1]["headers"]["Idempotency-Key"] != first["headers"]["Idempotency-Key"]

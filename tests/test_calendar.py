@@ -114,3 +114,17 @@ def test_item_mapping_helpers() -> None:
     event = item_to_event(SCHEDULE[0])
     assert event is not None
     assert event.uid == "travel-1"
+
+
+def test_stale_travel_uses_the_same_passenger_information_as_the_backend() -> None:
+    details = "Prévisions du planning périmées.\nIC 07:15 Mons (quai 4) → 08:00 Bruxelles"
+    item = {
+        "type": "travel",
+        "status": "stale",
+        "stale_snapshot": True,
+        "travel_details": details,
+        "legs": [{"realtime": True}],
+    }
+    observed = describe_item(item)
+    assert details in observed
+    assert "[temps réel]" not in observed

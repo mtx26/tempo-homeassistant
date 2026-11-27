@@ -82,7 +82,9 @@ class TempoConversationEntity(TempoEntity, conversation.ConversationEntity):
         texts = _messages(user_input.language)
         try:
             result = await self.coordinator.client.conversation(
-                user_input.text, chat_log.conversation_id
+                user_input.text,
+                chat_log.conversation_id,
+                user_id=user_input.context.user_id,
             )
         except TempoNotFoundError:
             return self._error(user_input, chat_log, texts["unavailable"])
@@ -95,7 +97,7 @@ class TempoConversationEntity(TempoEntity, conversation.ConversationEntity):
             return self._error(user_input, chat_log, texts["error"])
 
         summary = str(result.get("reply") or "").strip() or texts["not_understood"]
-        if result.get("changed"):
+        if result.get("changed") or result.get("proposal_id"):
             await self.coordinator.async_request_refresh()
         chat_log.async_add_assistant_content_without_tools(
             conversation.AssistantContent(agent_id=user_input.agent_id, content=summary)

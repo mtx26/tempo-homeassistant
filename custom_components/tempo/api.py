@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, cast
 from urllib.parse import quote
+from uuid import uuid4
 
 import aiohttp
 from yarl import URL
@@ -83,10 +84,13 @@ class TempoApiClient:
         json: Any = None,
         auth: bool = True,
         seconds: float = DEFAULT_TIMEOUT_SECONDS,
+        idempotency_key: str | None = None,
     ) -> Any:
         headers = {"Accept": "application/json"}
         if auth:
             headers["Authorization"] = f"Bearer {self._token}"
+        if idempotency_key is not None:
+            headers["Idempotency-Key"] = idempotency_key
         try:
             async with self._session.request(
                 method,
@@ -188,17 +192,37 @@ class TempoApiClient:
             await self._request("PUT", "/v1/llm", json={"model": model}, seconds=LLM_PROBE_SECONDS),
         )
 
-    async def conversation(self, text: str, conversation_id: str | None) -> dict[str, Any]:
+    async def conversation(
+        self,
+        text: str,
+        conversation_id: str | None,
+        *,
+        user_id: str | None = None,
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
         """POST /v1/conversation: natural-language request, real outcome in ``reply``."""
         payload: dict[str, Any] = {"text": text}
         if conversation_id:
             payload["conversation_id"] = conversation_id[:100]
-        return cast(
-            dict[str, Any],
-            await self._request(
-                "POST", "/v1/conversation", json=payload, seconds=CONVERSATION_TIMEOUT_SECONDS
-            ),
-        )
+        if user_id:
+            payload["user_id"] = user_id
+        key = idempotency_key or uuid4().hex
+        for last_attempt in (False, True):
+            try:
+                return cast(
+                    dict[str, Any],
+                    await self._request(
+                        "POST",
+                        "/v1/conversation",
+                        json=payload,
+                        seconds=CONVERSATION_TIMEOUT_SECONDS,
+                        idempotency_key=key,
+                    ),
+                )
+            except TempoConnectionError as err:
+                if last_attempt or not isinstance(err.__cause__, aiohttp.ServerDisconnectedError):
+                    raise
+        raise AssertionError("conversation retry did not complete")
 
     async def operation(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         """POST /v1/operations/{name}: ``{"ok": true, "result": ...}`` (422 when refused)."""
