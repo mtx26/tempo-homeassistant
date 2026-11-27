@@ -2,7 +2,7 @@
 
 Custom integration (HACS layout) for **Tempo**, a self-hosted personal planner managed by
 natural-language conversation. The planning backend is a separate private service reached over
-the internal network with a bearer token. Version `0.3.0`. Product and architecture:
+the internal network with a bearer token. Product and architecture:
 `ARCHITECTURE.md` of the Tempo backend repository.
 
 Licence: to be chosen by the owner.
@@ -32,11 +32,13 @@ d'intégration.
 
 `hacs.json` déclare le minimum `2026.2.0`. Les tests automatisés simulent le backend ; un test
 de contrat du dépôt backend exécute le vrai client de cette intégration contre le vrai backend.
-**Installation HACS réelle non testée** (le dépôt n'est pas publié). La conversation attend
-jusqu'à 150 s la réponse du backend (budget de 60 s de l'assistant plus une replanification).
+L'installation dans une instance HACS reste à vérifier. Pour la version 0.7.1 de
+l'intégration, mettez à jour le backend vers Tempo 0.8.3 avant de mettre à jour Home Assistant.
+La conversation attend jusqu'à 150 s la réponse du backend (budget de 60 s de l'assistant
+plus une replanification).
 
 ## Installation
-- **HACS (une fois le dépôt publié)** : HACS → ⋮ → *Dépôts personnalisés* →
+- **HACS** : HACS → ⋮ → *Dépôts personnalisés* →
   `https://github.com/mtx26/tempo-homeassistant`, catégorie *Intégration*, installer *Tempo*,
   redémarrer Home Assistant.
 - **Manuelle** : copier `custom_components/tempo` dans `config/custom_components/`, redémarrer.
@@ -66,8 +68,5 @@ uv run mypy                   # strict
 uv run pytest                 # Linux or WSL only: Home Assistant does not import on Windows
 ```
 `tests/test_metadata.py` covers what can be checked locally from hassfest/HACS (manifest,
-translation parity, absence of business services/buttons, brand sizes). The CI workflow
-(`.github/workflows/validate.yml`) only runs once the repository is published.
-
-## Before publication (owner decisions)
-- Licence, GitHub repository visibility/description, first release.
+translation parity, absence of business services/buttons, brand sizes). The GitHub Actions
+workflow also runs hassfest and HACS checks.
